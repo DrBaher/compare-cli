@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 // Constants
 // ----------------------------------------------------------------------------
 
-export const VERSION = "0.1.1";
+export const VERSION = "0.2.0";
 
 // Stable exit codes. Documented in AGENTS.md and never re-numbered without a
 // major-version bump.
@@ -64,11 +64,17 @@ const KNOWN_FLAGS = Object.freeze([
   "--version", "-V",
   "--demo",
   "--json",
+  "--sarif",
   "--why",
   "--strict",
   "--strict-cosmetic",
   "--silent", "-q",
+  "--check",
   "--from-negotiation",
+  "--require-signoffs",
+  "--only-clauses",
+  "--ignore-clauses",
+  "--no-intra-diff",
   "--output", "-o",
   "--completion",
 ]);
@@ -80,10 +86,16 @@ export function parseArgs(argv) {
     fromNegotiation: null,
     output: null,
     json: false,
+    sarif: false,
     why: false,
     strict: false,
     strictCosmetic: false,
     silent: false,
+    check: false,
+    requireSignoffs: false,
+    onlyClauses: null,
+    ignoreClauses: null,
+    noIntraDiff: false,
     help: false,
     version: false,
     demo: false,
@@ -97,10 +109,18 @@ export function parseArgs(argv) {
     else if (a === "--version" || a === "-V") opts.version = true;
     else if (a === "--demo") opts.demo = true;
     else if (a === "--json") opts.json = true;
+    else if (a === "--sarif") opts.sarif = true;
     else if (a === "--why") opts.why = true;
     else if (a === "--strict") opts.strict = true;
     else if (a === "--strict-cosmetic") opts.strictCosmetic = true;
     else if (a === "--silent" || a === "-q") opts.silent = true;
+    else if (a === "--check") opts.check = true;
+    else if (a === "--require-signoffs") opts.requireSignoffs = true;
+    else if (a === "--no-intra-diff") opts.noIntraDiff = true;
+    else if (a === "--only-clauses") opts.onlyClauses = parseClausePatterns(requireValue(argv, ++i, "--only-clauses"));
+    else if (a.startsWith("--only-clauses=")) opts.onlyClauses = parseClausePatterns(a.slice("--only-clauses=".length));
+    else if (a === "--ignore-clauses") opts.ignoreClauses = parseClausePatterns(requireValue(argv, ++i, "--ignore-clauses"));
+    else if (a.startsWith("--ignore-clauses=")) opts.ignoreClauses = parseClausePatterns(a.slice("--ignore-clauses=".length));
     else if (a === "--from-negotiation") opts.fromNegotiation = requireValue(argv, ++i, "--from-negotiation");
     else if (a.startsWith("--from-negotiation=")) opts.fromNegotiation = a.slice("--from-negotiation=".length);
     else if (a === "--output" || a === "-o") opts.output = requireValue(argv, ++i, "--output");
@@ -113,6 +133,18 @@ export function parseArgs(argv) {
     else if (a === "--") { /* end-of-flags marker */ for (let j = i + 1; j < argv.length; j++) positional.push(argv[j]); break; }
     else if (a.startsWith("-") && a !== "-") throw new UsageError(`unknown flag: ${a}${suggest(a)}`);
     else positional.push(a);
+  }
+
+  // --check implies --silent (suppress stderr too) — single discoverable flag
+  // for the CI use case where only the exit code matters.
+  if (opts.check) opts.silent = true;
+
+  // --json and --sarif are mutually exclusive output formats.
+  if (opts.json && opts.sarif) throw new UsageError("--json and --sarif are mutually exclusive");
+
+  // --require-signoffs is meaningful only with --from-negotiation.
+  if (opts.requireSignoffs && opts.fromNegotiation === null && !opts.help && !opts.version && !opts.demo) {
+    throw new UsageError("--require-signoffs requires --from-negotiation");
   }
 
   if (opts.help || opts.version || opts.demo || opts.completion !== null) return { opts, positional };
@@ -139,6 +171,44 @@ function requireValue(argv, i, flag) {
   const v = argv[i];
   if (v === undefined) throw new UsageError(`${flag} requires a value`);
   return v;
+}
+
+// Parse the value of --only-clauses / --ignore-clauses. Comma-separated;
+// each pattern is lowercased and trimmed; empties dropped. Returned as a
+// frozen list of lowercase substrings.
+export function parseClausePatterns(s) {
+  if (typeof s !== "string") return null;
+  const parts = s.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean);
+  return parts.length > 0 ? Object.freeze(parts) : null;
+}
+
+// Test whether a clause title matches any of a pattern list (case-insensitive
+// substring). Patterns are matched against normalizeTitle(title) for
+// numbering-agnostic behavior.
+export function clauseTitleMatches(title, patterns) {
+  if (!patterns || patterns.length === 0) return false;
+  const norm = normalizeTitle(title);
+  for (const p of patterns) {
+    if (norm.includes(p)) return true;
+  }
+  return false;
+}
+
+// Apply --only-clauses / --ignore-clauses filters to a differences[] list.
+// Returns { kept, suppressed_count } where suppressed_count counts the
+// classification-bearing diffs that were dropped (anything not in `kept`).
+export function applyClauseFilters(differences, { onlyClauses = null, ignoreClauses = null } = {}) {
+  if (!onlyClauses && !ignoreClauses) return { kept: differences, suppressed_count: 0 };
+  const kept = [];
+  let suppressed = 0;
+  for (const d of differences) {
+    let pass = true;
+    if (onlyClauses && !clauseTitleMatches(d.clause_title, onlyClauses)) pass = false;
+    if (pass && ignoreClauses && clauseTitleMatches(d.clause_title, ignoreClauses)) pass = false;
+    if (pass) kept.push(d);
+    else suppressed++;
+  }
+  return { kept, suppressed_count: suppressed };
 }
 
 function suggest(unknown) {
@@ -499,7 +569,11 @@ function longestIncreasingSubsequenceIndices(arr) {
 // https://github.com/DrBaher/nda-review-cli/blob/main/docs/reference/state-file.md
 const AGREED_TOP_LEVEL_STATUSES = new Set(["converged", "signed_off", "finalized"]);
 
-export function readNegotiation(path, { readFile = readFileSync, exists = existsSync } = {}) {
+export function readNegotiation(path, {
+  readFile = readFileSync,
+  exists = existsSync,
+  requireSignoffs = false,
+} = {}) {
   if (!exists(path)) {
     const e = new Error(`input not found: ${path}`); e.exit = EXIT.IO; throw e;
   }
@@ -512,6 +586,28 @@ export function readNegotiation(path, { readFile = readFileSync, exists = exists
   if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.rounds) || parsed.rounds.length === 0) {
     const e = new Error(`${path}: expected an object with a non-empty 'rounds' array`); e.exit = EXIT.IO; throw e;
   }
+
+  // Optional safety check (--require-signoffs): both parties must have a
+  // non-empty signoff string in the top-level signoffs object. Per nda-review-
+  // cli's state-file.md, signoffs.a and signoffs.b are populated by the
+  // `negotiate sign-off --as a/b` command after both parties review.
+  if (requireSignoffs) {
+    const so = parsed.signoffs;
+    const aOk = so && typeof so.a === "string" && so.a.length > 0;
+    const bOk = so && typeof so.b === "string" && so.b.length > 0;
+    if (!aOk || !bOk) {
+      const missing = [];
+      if (!aOk) missing.push("a");
+      if (!bOk) missing.push("b");
+      const e = new Error(
+        `--require-signoffs: ${path} is not signed off by both parties\n` +
+        `       (missing signoffs.${missing.join(" and signoffs.")})`
+      );
+      e.exit = EXIT.SUBSTANTIVE;
+      throw e;
+    }
+  }
+
   // Tier 1: top-level status — nda-review-cli's authoritative convergence signal.
   if (typeof parsed.status === "string" && AGREED_TOP_LEVEL_STATUSES.has(parsed.status)) {
     for (let i = parsed.rounds.length - 1; i >= 0; i--) {
@@ -638,7 +734,7 @@ export function computeExitClass(differences, { strict = false, strictCosmetic =
 // Report builders
 // ----------------------------------------------------------------------------
 
-export function buildReportJson({ base, candidate, baseClauses, candClauses, differences, exitClass, exitCode, warnings }) {
+export function buildReportJson({ base, candidate, baseClauses, candClauses, differences, exitClass, exitCode, warnings, suppressedByFilter = 0 }) {
   const counts = { cosmetic: 0, typographic: 0, substantive: 0, added: 0, removed: 0, moved: 0 };
   for (const d of differences) counts[d.class] = (counts[d.class] || 0) + 1;
   return {
@@ -654,10 +750,174 @@ export function buildReportJson({ base, candidate, baseClauses, candClauses, dif
       clauses_added: counts.added,
       clauses_removed: counts.removed,
       differences: counts,
+      suppressed_by_filter: suppressedByFilter,
     },
     differences,
     warnings,
   };
+}
+
+// SARIF v2.1.0 — https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html
+// Each difference becomes one `result` with:
+//   ruleId        compare-cli.<class>     (substantive, cosmetic, typographic, added, removed, moved)
+//   level         error | warning | note  (substantive → error; cosmetic/typographic → warning; the rest → note)
+//   message.text  "[<class>] <clause_title> — <short summary>"
+//   locations     candidate file URI; substantive/cosmetic/typographic also reference the base file as a related location
+// The CLI-level exit_class is encoded as a top-level invocation property and
+// as a single "synthetic" result so CI systems can show one summary annotation.
+const SARIF_LEVEL_BY_CLASS = {
+  substantive: "error",
+  cosmetic: "warning",
+  typographic: "warning",
+  added: "note",
+  removed: "note",
+  moved: "note",
+};
+
+const SARIF_RULES = [
+  { id: "compare-cli.substantive", name: "SubstantiveDrift", shortDescription: { text: "Substantive content change between clauses — do not sign without review." } },
+  { id: "compare-cli.cosmetic", name: "CosmeticDrift", shortDescription: { text: "Whitespace or Unicode-presentation difference only." } },
+  { id: "compare-cli.typographic", name: "TypographicDrift", shortDescription: { text: "Case / number-format / Oxford-comma difference only." } },
+  { id: "compare-cli.added", name: "ClauseAdded", shortDescription: { text: "Candidate has a clause not present in base." } },
+  { id: "compare-cli.removed", name: "ClauseRemoved", shortDescription: { text: "Base has a clause not present in candidate." } },
+  { id: "compare-cli.moved", name: "ClauseMoved", shortDescription: { text: "Clause moved to a different position; body identical." } },
+];
+
+function pathToFileUri(p) {
+  // SARIF allows relative URIs; for absolute paths use file:// prefix.
+  if (p === "-" || p == null) return "stdin";
+  if (p.startsWith("<")) return p;  // demo synthetic paths like <demo:base>
+  if (p.startsWith("/")) return `file://${p}`;
+  return p;
+}
+
+export function buildReportSarif(report) {
+  const results = [];
+  for (const d of report.differences) {
+    const level = SARIF_LEVEL_BY_CLASS[d.class] || "note";
+    const summary = d.class === "moved"
+      ? `moved from position ${d.clause_index_base} to ${d.clause_index_candidate}`
+      : d.class === "added"
+      ? `added in candidate`
+      : d.class === "removed"
+      ? `removed from base`
+      : `body differs (base vs candidate)`;
+    const r = {
+      ruleId: `compare-cli.${d.class}`,
+      level,
+      message: { text: `[${d.class}] ${d.clause_title} — ${summary}` },
+      locations: [{
+        physicalLocation: {
+          artifactLocation: { uri: pathToFileUri(report.candidate.path) },
+        },
+        message: { text: `clause ${d.clause_index_candidate ?? "(n/a)"} in candidate` },
+      }],
+    };
+    if (d.clause_index_base != null) {
+      r.relatedLocations = [{
+        physicalLocation: { artifactLocation: { uri: pathToFileUri(report.base.path) } },
+        message: { text: `clause ${d.clause_index_base} in base` },
+      }];
+    }
+    results.push(r);
+  }
+  return {
+    version: "2.1.0",
+    $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+    runs: [{
+      tool: {
+        driver: {
+          name: "compare-cli",
+          version: VERSION,
+          informationUri: "https://github.com/DrBaher/compare-cli",
+          rules: SARIF_RULES,
+        },
+      },
+      invocations: [{
+        executionSuccessful: true,
+        exitCode: report.exit_code,
+        properties: {
+          exit_class: report.exit_class,
+          suppressed_by_filter: report.summary.suppressed_by_filter || 0,
+        },
+      }],
+      results,
+      properties: {
+        base_path: report.base.path,
+        candidate_path: report.candidate.path,
+        clauses_total_base: report.base.clauses_total,
+        clauses_total_candidate: report.candidate.clauses_total,
+      },
+    }],
+  };
+}
+
+// Word-level diff between two strings using Hunt–McIlroy LCS over whitespace-
+// separated tokens. Returns ops as { op: "equal"|"removed"|"added", text }.
+// Whitespace and punctuation collapse into the token boundary (each run of
+// non-whitespace becomes one token). For human display in formatReportHuman.
+export function wordDiff(a, b) {
+  const ta = a.split(/(\s+)/).filter((t) => t.length > 0);
+  const tb = b.split(/(\s+)/).filter((t) => t.length > 0);
+  const m = ta.length, n = tb.length;
+  // Edge cases
+  if (m === 0 && n === 0) return [];
+  if (m === 0) return [{ op: "added", text: tb.join("") }];
+  if (n === 0) return [{ op: "removed", text: ta.join("") }];
+  // LCS table
+  const dp = Array.from({ length: m + 1 }, () => new Int32Array(n + 1));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      if (ta[i] === tb[j]) dp[i][j] = dp[i + 1][j + 1] + 1;
+      else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  // Walk back through the table emitting ops
+  const ops = [];
+  let i = 0, j = 0;
+  const push = (op, text) => {
+    if (text.length === 0) return;
+    const last = ops[ops.length - 1];
+    if (last && last.op === op) last.text += text;
+    else ops.push({ op, text });
+  };
+  while (i < m && j < n) {
+    if (ta[i] === tb[j]) { push("equal", ta[i]); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { push("removed", ta[i]); i++; }
+    else { push("added", tb[j]); j++; }
+  }
+  while (i < m) { push("removed", ta[i]); i++; }
+  while (j < n) { push("added", tb[j]); j++; }
+  return ops;
+}
+
+// Compute the "change density" of a word diff — the fraction of total
+// characters that are part of an added or removed op. Used to decide whether
+// to render intra-diff inline (low density = readable) or fall back to the
+// two-line format (high density = unreadable spaghetti).
+export function wordDiffChangeDensity(ops) {
+  let changed = 0, total = 0;
+  for (const o of ops) {
+    total += o.text.length;
+    if (o.op !== "equal") changed += o.text.length;
+  }
+  return total === 0 ? 0 : changed / total;
+}
+
+const INTRA_DIFF_DENSITY_THRESHOLD = 0.7;
+
+// Render a word-diff ops list for human output. With color: removed = red
+// strikethrough-ish (using paint), added = green. Without color: GitHub-style
+// `[-removed-]` / `{+added+}` markers.
+function renderWordDiff(ops, stream, env) {
+  const useColor = colorEnabled(stream, env);
+  const parts = [];
+  for (const o of ops) {
+    if (o.op === "equal") parts.push(o.text);
+    else if (o.op === "removed") parts.push(useColor ? paint(stream, "red", o.text, env) : `[-${o.text}-]`);
+    else parts.push(useColor ? paint(stream, "green", o.text, env) : `{+${o.text}+}`);
+  }
+  return parts.join("");
 }
 
 const CLASS_COLOR = {
@@ -677,7 +937,11 @@ const CLASS_LABEL = {
   moved: "moved",
 };
 
-export function formatReportHuman(report, { stream, env = process.env } = {}) {
+// Threshold: combined base+candidate longer than this falls back to the
+// two-line format (intra-diff would be too long to read inline).
+const INTRA_DIFF_MAX_COMBINED_LEN = 600;
+
+export function formatReportHuman(report, { stream, env = process.env, intraDiff = true } = {}) {
   const lines = [];
   const c = (color, s) => paint(stream, color, s, env);
   const head = c("bold", `compare: ${report.base.path}  →  ${report.candidate.path}`);
@@ -695,6 +959,9 @@ export function formatReportHuman(report, { stream, env = process.env } = {}) {
       if (counts[k] > 0) parts.push(c(CLASS_COLOR[k], `${counts[k]} ${CLASS_LABEL[k]}`));
     }
     lines.push(`summary: ${parts.join(", ")}`);
+    if (report.summary.suppressed_by_filter > 0) {
+      lines.push(c("dim", `         ${report.summary.suppressed_by_filter} difference(s) suppressed by --only-clauses / --ignore-clauses`));
+    }
     lines.push("");
     for (const d of report.differences) {
       const tag = c(CLASS_COLOR[d.class] || "yellow", `[${d.class}]`);
@@ -711,8 +978,19 @@ export function formatReportHuman(report, { stream, env = process.env } = {}) {
       } else if (d.class === "removed") {
         lines.push(c("dim", `       - ${truncate(d.base)}`));
       } else {
-        lines.push(c("red", `       - ${truncate(d.base)}`));
-        lines.push(c("green", `       + ${truncate(d.candidate)}`));
+        const baseText = d.base || "";
+        const candText = d.candidate || "";
+        const wantIntra = intraDiff && d.class === "substantive"
+          && (baseText.length + candText.length) <= INTRA_DIFF_MAX_COMBINED_LEN;
+        if (wantIntra) {
+          const ops = wordDiff(baseText, candText);
+          if (wordDiffChangeDensity(ops) <= INTRA_DIFF_DENSITY_THRESHOLD) {
+            lines.push(`       ${renderWordDiff(ops, stream, env)}`);
+            continue;
+          }
+        }
+        lines.push(c("red", `       - ${truncate(baseText)}`));
+        lines.push(c("green", `       + ${truncate(candText)}`));
       }
     }
   }
@@ -806,7 +1084,7 @@ _compare_cli_complete() {
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
-  opts="--help --version --demo --json --why --strict --strict-cosmetic --silent --from-negotiation --output --completion"
+  opts="--help --version --demo --json --sarif --why --strict --strict-cosmetic --silent --check --from-negotiation --require-signoffs --only-clauses --ignore-clauses --no-intra-diff --output --completion"
   case "\$prev" in
     --completion) COMPREPLY=( $(compgen -W "bash zsh" -- "\$cur") ); return 0 ;;
     --from-negotiation|--output) COMPREPLY=( $(compgen -f -- "\$cur") ); return 0 ;;
@@ -830,12 +1108,18 @@ _compare_cli() {
     '--version[Print version]'
     '--demo[Run a zero-file 30-second first run]'
     '--json[Emit JSON report]'
+    '--sarif[Emit SARIF v2.1.0 for CI annotations]'
     '--why[Print structured stderr explanation]'
     '--strict[Treat typographic drift as substantive]'
     '--strict-cosmetic[Treat cosmetic drift as substantive]'
     '--silent[Suppress stderr]'
     '-q[Suppress stderr]'
+    '--check[Suppress all output; communicate via exit code only]'
     '--from-negotiation[Read base from negotiation.json]:negotiation.json:_files'
+    '--require-signoffs[Require both parties signed off in negotiation.json]'
+    '--only-clauses[Comma-separated clause patterns to include]:patterns:'
+    '--ignore-clauses[Comma-separated clause patterns to exclude]:patterns:'
+    '--no-intra-diff[Disable inline word-level diff]'
     '--output[Write report to PATH]:path:_files'
     '--completion[Emit shell completion]:shell:(bash zsh)'
     '*:file:_files'
@@ -865,12 +1149,18 @@ ARGS
 
 OPTIONS
   --from-negotiation PATH   read base text from nda-review-cli's negotiation.json
+  --require-signoffs        with --from-negotiation, require both parties to have signed off
+  --only-clauses PATTERNS   comma-separated; only include matching clause titles in the report + exit code
+  --ignore-clauses PATTERNS comma-separated; exclude matching clause titles from the report + exit code
   --strict                  treat typographic drift as substantive (exit 2)
   --strict-cosmetic         treat cosmetic drift as substantive (exit 2)
   --json                    emit structured JSON to stdout
+  --sarif                   emit SARIF v2.1.0 to stdout (for code-scanning / CI annotations)
+  --no-intra-diff           disable inline word-level diff inside substantive clauses (use two-line - / + format)
   --why                     print structured explanation to stderr
   --silent, -q              suppress stderr
-  --output, -o PATH         write report to PATH instead of stdout
+  --check                   suppress all output; communicate via exit code only (implies --silent)
+  --output, -o PATH         write report to PATH instead of stdout (ignored with --check)
   --completion bash|zsh     emit shell completion script
   --demo                    run a zero-file 30-second demo
   --version, -V             print version
@@ -927,7 +1217,7 @@ export async function main(argv, io = {}) {
   let base, candidate;
   try {
     if (opts.fromNegotiation) {
-      const text = readNegotiation(opts.fromNegotiation);
+      const text = readNegotiation(opts.fromNegotiation, { requireSignoffs: opts.requireSignoffs });
       base = { path: opts.fromNegotiation, text, format: "negotiation", lossiness: "none" };
     } else {
       base = await readInput(opts.base, { stdinReader });
@@ -937,6 +1227,8 @@ export async function main(argv, io = {}) {
     if (!opts.silent) {
       if (opts.json) {
         out.write(JSON.stringify({ ok: false, error: e.message, exit_code: e.exit || EXIT.IO }) + "\n");
+      } else if (opts.sarif) {
+        out.write(JSON.stringify({ version: "2.1.0", runs: [{ tool: { driver: { name: "compare-cli", version: VERSION } }, invocations: [{ executionSuccessful: false, exitCode: e.exit || EXIT.IO, exitCodeDescription: e.message }], results: [] }] }, null, 2) + "\n");
       } else {
         err.write(`error: ${e.message}\n`);
       }
@@ -948,7 +1240,15 @@ export async function main(argv, io = {}) {
 }
 
 async function runCompare({ base, candidate, opts, out, err, env }) {
-  const { baseClauses, candClauses, baseDetect, candDetect, differences } = compareDocuments(base, candidate);
+  const { baseClauses, candClauses, baseDetect, candDetect, differences: rawDifferences } = compareDocuments(base, candidate);
+
+  // Apply --only-clauses / --ignore-clauses BEFORE classification so the
+  // exit code only reflects what the user asked us to care about.
+  const { kept: differences, suppressed_count: suppressedByFilter } = applyClauseFilters(rawDifferences, {
+    onlyClauses: opts.onlyClauses,
+    ignoreClauses: opts.ignoreClauses,
+  });
+
   const exitInfo = computeExitClass(differences, { strict: opts.strict, strictCosmetic: opts.strictCosmetic });
 
   const warnings = [];
@@ -958,6 +1258,7 @@ async function runCompare({ base, candidate, opts, out, err, env }) {
   const report = buildReportJson({
     base, candidate, baseClauses, candClauses, differences,
     exitClass: exitInfo.class, exitCode: exitInfo.code, warnings,
+    suppressedByFilter,
   });
 
   // --why goes to stderr unless --silent
@@ -969,14 +1270,22 @@ async function runCompare({ base, candidate, opts, out, err, env }) {
       strictCosmetic: opts.strictCosmetic,
     }));
   }
-  // Non-json warnings also go to stderr (json mode embeds them in the payload)
-  if (!opts.json && !opts.silent) {
+  // Non-json warnings also go to stderr (json/sarif modes embed them in the payload)
+  if (!opts.json && !opts.sarif && !opts.silent) {
     for (const w of warnings) err.write(`warning: ${w}\n`);
   }
 
-  const body = opts.json
+  const body = opts.sarif
+    ? JSON.stringify(buildReportSarif(report), null, 2) + "\n"
+    : opts.json
     ? JSON.stringify(report, null, 2) + "\n"
-    : formatReportHuman(report, { stream: out, env });
+    : formatReportHuman(report, { stream: out, env, intraDiff: !opts.noIntraDiff });
+
+  // --check suppresses stdout entirely (exit code is the result). --output is
+  // also skipped under --check (the user said they only care about the code).
+  if (opts.check) {
+    return exitInfo.code;
+  }
 
   if (opts.output && opts.output !== "-") {
     const { writeFileSync } = await import("node:fs");

@@ -142,12 +142,18 @@ ARGS
 
 OPTIONS
   --from-negotiation PATH   read base text from nda-review-cli's negotiation.json
+  --require-signoffs        with --from-negotiation, require both parties to have signed off
+  --only-clauses PATTERNS   comma-separated; only include matching clause titles in the report + exit code
+  --ignore-clauses PATTERNS comma-separated; exclude matching clause titles from the report + exit code
   --strict                  treat typographic drift as substantive (exit 2)
   --strict-cosmetic         treat cosmetic drift as substantive (exit 2)
   --json                    emit structured JSON to stdout
+  --sarif                   emit SARIF v2.1.0 to stdout (for code-scanning / CI annotations)
+  --no-intra-diff           disable inline word-level diff inside substantive clauses
   --why                     print structured explanation to stderr
   --silent, -q              suppress stderr
-  --output, -o PATH         write report to PATH instead of stdout
+  --check                   suppress all output; communicate via exit code only (implies --silent)
+  --output, -o PATH         write report to PATH instead of stdout (ignored with --check)
   --completion bash|zsh     emit shell completion script
   --demo                    run a zero-file 30-second demo
   --version, -V             print version
@@ -199,10 +205,53 @@ Same posture as draft-cli's `--why`.
 ### `--from-negotiation`
 
 Reads `nda-review-cli`'s `negotiation.json` and extracts the latest
-agreed text as BASE. compare-cli v1 supports both the **minimum schema**
-(per-round `agreed: true`) and the **de-facto current** nda-review-cli
-release (per-round `clause_status` with all values equal to `"agreed"`).
-See [COMPARE_SCHEMA.md §9](./COMPARE_SCHEMA.md).
+agreed text as BASE. Three-tier resolution (preferred → fallback):
+top-level `status: converged|signed_off|finalized`, per-round
+`agreed: true` (minimum schema), per-round `clause_status` all
+`"agreed"` (historical fallback). See
+[COMPARE_SCHEMA.md §9](./COMPARE_SCHEMA.md).
+
+Pair with **`--require-signoffs`** when running unattended: it errors
+(exit 2) unless both `signoffs.a` and `signoffs.b` are non-empty in the
+state file. nda-review-cli populates these when the `negotiate sign-off`
+checkpoint is satisfied — a human-review gate before any agreement is
+acted on.
+
+### Clause filters
+
+`--only-clauses Term,Payment,Indemnification` keeps only matching
+clauses in the report and exit-code calculation; `--ignore-clauses
+Acknowledgments,Notices` drops matching ones. Patterns are
+case-insensitive substrings, matched against numbering-stripped clause
+titles. Both flags can combine (`--ignore-clauses` runs after
+`--only-clauses`). The number of suppressed differences is surfaced in
+the human report and as `summary.suppressed_by_filter` in `--json` /
+SARIF output, so the suppression is auditable.
+
+### `--sarif` (CI / code-scanning)
+
+`--sarif` emits a SARIF v2.1.0 document. Each substantive difference is
+a result with `level: error`; cosmetic/typographic are `warning`;
+added/removed/moved are `note`. Designed for GitHub Actions code-
+scanning upload — substantive drift appears as inline annotations on
+the candidate file in the PR review UI.
+
+```sh
+compare base.docx contracts/2026/acme.docx --sarif > compare.sarif
+# upload via: github/codeql-action/upload-sarif@v3 with sarif_file=compare.sarif
+```
+
+### `--check` (exit-code-only mode)
+
+`--check` suppresses both stdout and stderr; the exit code is the only
+output. Use for CI gates and short shell pipelines:
+
+```sh
+compare base.docx cand.docx --check && echo "safe to sign"
+```
+
+Implies `--silent`. `--output` is also skipped under `--check` (you said
+you only care about the exit code).
 
 If no agreed round exists, the CLI exits 2 with a clear error.
 

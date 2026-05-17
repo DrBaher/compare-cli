@@ -4,6 +4,75 @@ All notable changes to this project will be documented in this file. The
 format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to semantic versioning once it leaves 0.x.
 
+## 0.2.0 — 2026-05-17
+
+Minor: six new flags / output behaviors, no breaking changes. Drives
+compare-cli toward two new workflows: **unattended CI gating** (via
+`--sarif`, `--check`, and clause filters) and **safer negotiation-driven
+comparison** (via `--require-signoffs`).
+
+### Added
+
+- **Intra-clause word-level diff in human output.** Substantive changes
+  inside a clause body now render inline as `[-removed-]{+added+}` (or
+  red/green color in a TTY) instead of two separate `- base / + candidate`
+  lines. Falls back to the original two-line format when (a) the combined
+  base+candidate exceeds 600 chars or (b) more than ~70% of the body
+  changed (intra-diff becomes unreadable). `--no-intra-diff` opts out
+  globally. JSON / SARIF output unchanged — they carry structured `base`
+  and `candidate` strings already, so consumers can render their own diff.
+- **`--require-signoffs`** (use with `--from-negotiation`). Requires
+  both `signoffs.a` and `signoffs.b` to be non-empty strings in the
+  `negotiation.json` state file (per
+  [nda-review-cli's state-file schema](https://github.com/DrBaher/nda-review-cli/blob/main/docs/reference/state-file.md)).
+  Errors with exit 2 if either is missing, listing which party is
+  outstanding. Closes a safety gap: previously compare-cli would read
+  agreed text even from an unsigned-off file. Default behavior unchanged
+  (opt-in flag).
+- **`--only-clauses PATTERNS`** and **`--ignore-clauses PATTERNS`**.
+  Comma-separated case-insensitive substring patterns matched against
+  numbering-stripped clause titles (`normalizeTitle`). Filters apply
+  before exit-code classification — if you `--ignore-clauses Notices`
+  and the only substantive change was in Notices, the run exits 0.
+  Suppressed-difference count surfaces in the human report and as
+  `summary.suppressed_by_filter` in JSON/SARIF so the filtering is
+  auditable. The two flags compose (`--ignore` runs after `--only`).
+- **`--sarif`** emits SARIF v2.1.0 to stdout. Each difference is a
+  result with class-mapped severity:
+  - `substantive` → `error`
+  - `cosmetic` / `typographic` → `warning`
+  - `added` / `removed` / `moved` → `note`
+  Designed for `github/codeql-action/upload-sarif@v3` — substantive
+  drift surfaces as inline annotations on the candidate file in the PR
+  review UI. Mutually exclusive with `--json`.
+- **`--check`** — suppresses both stdout and stderr; exit code is the
+  only output. Implies `--silent`. `--output` is skipped under `--check`.
+  Convention match: `prettier --check`, `tsc --noEmit`.
+
+### Changed
+
+- `readNegotiation(path)` now accepts an optional `{ requireSignoffs }`
+  flag. Default behavior unchanged. Existing callers / synthetic
+  schemas keep working.
+- The `--why` block and warnings are now suppressed under `--sarif`
+  the same way they are under `--json` (structured output should be
+  the only thing on stdout / stderr for a structured-format run).
+
+### Tests
+
+154 → 186 (added 32 new tests). One new file `tests/test_additions_v020.mjs`
+covers all five new flags + the four new exported helpers (`wordDiff`,
+`wordDiffChangeDensity`, `parseClausePatterns`, `clauseTitleMatches`,
+`applyClauseFilters`, `buildReportSarif`).
+
+### Out of scope for 0.2.0
+
+- **MCP server** for compare-cli was proposed alongside these additions
+  but deferred to its own design pass (`docs/mcp.md`). Adds a runtime
+  dep (`@modelcontextprotocol/sdk`); packaging trade-off (separate
+  `compare-cli-mcp` package vs. bundle) needs explicit decision before
+  implementation.
+
 ## 0.1.1 — 2026-05-17
 
 Reconciliation pass against the sibling-CLI specs **plus** a doc fix for the

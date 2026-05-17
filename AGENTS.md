@@ -58,7 +58,8 @@ stderr regardless of `--silent`.
       "added": 0,
       "removed": 0,
       "moved": 0
-    }
+    },
+    "suppressed_by_filter": 0
   },
   "differences": [],
   "warnings": []
@@ -74,7 +75,9 @@ without a major-version bump:
   `differences`, `warnings`
 - Per `base` / `candidate`: `path`, `format`, `lossiness`, `clauses_total`
 - Per `summary`: `clauses_total`, `clauses_changed`, `clauses_moved`,
-  `clauses_added`, `clauses_removed`, `differences`
+  `clauses_added`, `clauses_removed`, `differences`, `suppressed_by_filter`
+  (added in v0.2.0; counts differences dropped by `--only-clauses` /
+  `--ignore-clauses`)
 - Per `summary.differences`: `cosmetic`, `typographic`, `substantive`,
   `added`, `removed`, `moved`
 - Per `differences[]` entry: `class`, `clause_title`, `clause_index_base`,
@@ -154,13 +157,53 @@ compare --from-negotiation negotiation.json ready-to-sign.pdf --json
 
 This reads `negotiation.json` (produced by
 [nda-review-cli](https://github.com/DrBaher/nda-review-cli)) and uses the
-latest agreed round's text as `BASE`. compare-cli v1 accepts both the
-minimum schema (`agreed: true` on a round) and the de-facto current
-nda-review-cli format (`clause_status` with all values `"agreed"`).
+latest agreed round's text as `BASE`. Three-tier resolution: top-level
+`status: converged|signed_off|finalized` (preferred), per-round
+`agreed: true`, per-round `clause_status` all `"agreed"`.
 
 If no agreed round exists, `compare` exits `2` with a clear error.
 compare-cli does **not** verify the hash chain — that's nda-review-cli's
 `negotiate validate`. Run it first if you need integrity guarantees.
+
+**Unattended pipelines: add `--require-signoffs`.** Errors if either
+`signoffs.a` or `signoffs.b` is missing or empty in the state file —
+catches the case where one party has not yet completed the
+`negotiate sign-off` human-review checkpoint. The flag is opt-in
+because some interactive workflows reasonably compare against agreed
+text before final sign-off.
+
+### CI gate via SARIF
+
+```sh
+compare base.docx contracts/2026/acme.docx --sarif > compare.sarif
+```
+
+Upload via `github/codeql-action/upload-sarif@v3` for inline PR
+annotations. Severity mapping: substantive → `error`, cosmetic /
+typographic → `warning`, added / removed / moved → `note`. The exit-
+code class is also stamped on `runs[0].invocations[0].properties.exit_class`.
+
+### Minimal CI gate via `--check`
+
+```sh
+compare base.docx cand.docx --check && echo "safe to sign" || exit $?
+```
+
+Suppresses all output — exit code is the only output. Implies `--silent`.
+Convention match: `prettier --check`, `tsc --noEmit`.
+
+### Focusing on material clauses
+
+```sh
+compare base.docx cand.docx --only-clauses Term,Payment,Indemnification --json
+```
+
+Filters the report and the exit-code classification to only the
+named clauses. Case-insensitive substring match against
+numbering-stripped titles. `--ignore-clauses Acknowledgments,Notices`
+inverts the filter. Both flags can combine. Suppressed-difference
+count surfaces in `summary.suppressed_by_filter` so the filtering is
+auditable.
 
 ### Strict mode for high-stakes pipelines
 
