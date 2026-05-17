@@ -6,6 +6,14 @@ and the project adheres to semantic versioning once it leaves 0.x.
 
 ## 0.1.0 — 2026-05-17
 
+> **Package name decision (pre-publish).** Published as **`compare-cli`**
+> (unscoped) rather than `@drbaher/compare-cli`. The unscoped name was
+> available on npm and shortens the install command (`npm i -g
+> compare-cli`) at the cost of diverging from draft-cli's scoped form.
+> The scoped form remains available for future use if a name collision
+> ever arises. `package.json` no longer carries `publishConfig.access`
+> since unscoped packages are public by default.
+
 > **Runtime baseline correction.** The original brief targeted Node ≥ 18,
 > but `pdfjs-dist@^5.7.284` (the pin we share with sign-cli for suite-wide
 > alignment) declares `engines.node: ">=22.13.0 || >=24"` and `npm ci`

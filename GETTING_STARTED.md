@@ -1,19 +1,19 @@
 # Getting started
 
 A 10-minute walkthrough of `compare-cli`. Assumes you've installed it
-(`npm install -g @drbaher/compare-cli`) or are using `npx`.
+(`npm install -g compare-cli`) or are using `npx`.
 
 ## 1. Install (or try without installing)
 
 ```sh
-npm install -g @drbaher/compare-cli
+npm install -g compare-cli
 compare --version
 ```
 
 Or run without installing:
 
 ```sh
-npx @drbaher/compare-cli@latest --demo
+npx compare-cli@latest --demo
 ```
 
 Requires Node ≥ 20.
