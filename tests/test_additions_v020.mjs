@@ -371,6 +371,83 @@ test("--sarif end-to-end: emits valid JSON shape with run/results", async () => 
   assert.equal(sarif.runs[0].invocations[0].properties.exit_class, "substantive");
 });
 
+// ---------------------------------------------------------------------------
+// 0.2.1 follow-ups: --why filter info + SARIF Windows path handling
+// ---------------------------------------------------------------------------
+
+test("--why surfaces filter info when --only-clauses set", async () => {
+  const dir = tmp();
+  const base = makeFile(dir, "base.md", "## Term\noriginal.\n\n## Notices\noriginal.");
+  const cand = makeFile(dir, "cand.md", "## Term\nchanged.\n\n## Notices\nchanged.");
+  const { err } = await runMain(main, [base, cand, "--only-clauses", "term", "--why"]);
+  assert.match(err, /why: filter\.only_clauses=term/);
+  assert.match(err, /filter\.suppressed=1/);
+});
+
+test("--why surfaces filter info when --ignore-clauses set", async () => {
+  const dir = tmp();
+  const base = makeFile(dir, "base.md", "## Term\noriginal.\n\n## Notices\noriginal.");
+  const cand = makeFile(dir, "cand.md", "## Term\nchanged.\n\n## Notices\nchanged.");
+  const { err } = await runMain(main, [base, cand, "--ignore-clauses", "notices,term", "--why"]);
+  assert.match(err, /filter\.ignore_clauses=notices\|term/);
+});
+
+test("--why does NOT add filter line when no filters set and nothing suppressed", async () => {
+  const dir = tmp();
+  const base = makeFile(dir, "base.md", "## A\nbody.");
+  const cand = makeFile(dir, "cand.md", "## A\nbody changed.");
+  const { err } = await runMain(main, [base, cand, "--why"]);
+  // No filter line — keeps the why block tight when nothing's filtered.
+  assert.equal(/why: filter\./.test(err), false);
+});
+
+test("SARIF pathToFileUri handles Windows absolute paths", () => {
+  // Manually construct a report with Windows paths and check the SARIF output.
+  const report = {
+    base: { path: "C:\\Users\\alice\\base.docx", format: "docx", lossiness: "none", clauses_total: 1 },
+    candidate: { path: "C:/Users/alice/cand.docx", format: "docx", lossiness: "none", clauses_total: 1 },
+    summary: { suppressed_by_filter: 0, differences: { substantive: 1, cosmetic: 0, typographic: 0, added: 0, removed: 0, moved: 0 } },
+    differences: [{
+      class: "substantive",
+      clause_title: "A",
+      clause_index_base: 1,
+      clause_index_candidate: 1,
+      base: "x",
+      candidate: "y",
+    }],
+    warnings: [],
+    exit_class: "substantive",
+    exit_code: 2,
+  };
+  const sarif = buildReportSarif(report);
+  const r = sarif.runs[0].results[0];
+  // Backslashes flipped to forward slashes; file:/// prefix per the file-URI scheme.
+  assert.equal(r.locations[0].physicalLocation.artifactLocation.uri, "file:///C:/Users/alice/cand.docx");
+  assert.equal(r.relatedLocations[0].physicalLocation.artifactLocation.uri, "file:///C:/Users/alice/base.docx");
+});
+
+test("SARIF pathToFileUri passes relative paths through unchanged", () => {
+  const report = {
+    base: { path: "contracts/base.docx", format: "docx", lossiness: "none", clauses_total: 1 },
+    candidate: { path: "contracts/cand.docx", format: "docx", lossiness: "none", clauses_total: 1 },
+    summary: { suppressed_by_filter: 0, differences: { substantive: 1, cosmetic: 0, typographic: 0, added: 0, removed: 0, moved: 0 } },
+    differences: [{
+      class: "substantive",
+      clause_title: "A",
+      clause_index_base: 1,
+      clause_index_candidate: 1,
+      base: "x",
+      candidate: "y",
+    }],
+    warnings: [],
+    exit_class: "substantive",
+    exit_code: 2,
+  };
+  const sarif = buildReportSarif(report);
+  // Relative paths stay relative — SARIF spec allows.
+  assert.equal(sarif.runs[0].results[0].locations[0].physicalLocation.artifactLocation.uri, "contracts/cand.docx");
+});
+
 test("--sarif maps each class to the right severity level", () => {
   const report = {
     base: { path: "b", format: "text", lossiness: "none", clauses_total: 4 },

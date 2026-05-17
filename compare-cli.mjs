@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 // Constants
 // ----------------------------------------------------------------------------
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.2.1";
 
 // Stable exit codes. Documented in AGENTS.md and never re-numbered without a
 // major-version bump.
@@ -783,12 +783,17 @@ const SARIF_RULES = [
   { id: "compare-cli.moved", name: "ClauseMoved", shortDescription: { text: "Clause moved to a different position; body identical." } },
 ];
 
-function pathToFileUri(p) {
-  // SARIF allows relative URIs; for absolute paths use file:// prefix.
+// SARIF allows relative URIs; for absolute paths use the file:// prefix.
+// Windows paths (e.g. C:\Users\... or C:/Users/...) become file:///C:/...
+// with backslashes flipped to forward slashes per the file-URI scheme.
+export function pathToFileUri(p) {
   if (p === "-" || p == null) return "stdin";
-  if (p.startsWith("<")) return p;  // demo synthetic paths like <demo:base>
-  if (p.startsWith("/")) return `file://${p}`;
-  return p;
+  if (p.startsWith("<")) return p;                       // demo synthetic paths like <demo:base>
+  if (p.startsWith("/")) return `file://${p}`;           // POSIX absolute
+  if (/^[A-Za-z]:[\\/]/.test(p)) {                       // Windows absolute
+    return `file:///${p.replace(/\\/g, "/")}`;
+  }
+  return p;                                              // relative — pass through
 }
 
 export function buildReportSarif(report) {
@@ -1027,6 +1032,15 @@ export function formatWhyBlock(report, opts) {
   lines.push(`why: classes.cosmetic=${d.cosmetic} typographic=${d.typographic} substantive=${d.substantive} added=${d.added} removed=${d.removed} moved=${d.moved}`);
   lines.push(`why: exit_class=${report.exit_class} exit_code=${report.exit_code}`);
   lines.push(`why: strict=${opts.strict} strict_cosmetic=${opts.strictCosmetic}`);
+  // Clause filters (added in 0.2.1): surface only when set or when something
+  // was actually suppressed, so the line is informative when present rather
+  // than noise on every run.
+  const only = opts.onlyClauses ? opts.onlyClauses.join("|") : "";
+  const ignore = opts.ignoreClauses ? opts.ignoreClauses.join("|") : "";
+  const suppressed = report.summary.suppressed_by_filter || 0;
+  if (only || ignore || suppressed > 0) {
+    lines.push(`why: filter.only_clauses=${only || "-"} filter.ignore_clauses=${ignore || "-"} filter.suppressed=${suppressed}`);
+  }
   return lines.join("\n") + "\n";
 }
 
@@ -1268,6 +1282,8 @@ async function runCompare({ base, candidate, opts, out, err, env }) {
       candTier: candDetect.tier,
       strict: opts.strict,
       strictCosmetic: opts.strictCosmetic,
+      onlyClauses: opts.onlyClauses,
+      ignoreClauses: opts.ignoreClauses,
     }));
   }
   // Non-json warnings also go to stderr (json/sarif modes embed them in the payload)
