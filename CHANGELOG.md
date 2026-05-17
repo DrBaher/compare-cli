@@ -4,6 +4,81 @@ All notable changes to this project will be documented in this file. The
 format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to semantic versioning once it leaves 0.x.
 
+## 0.1.1 — 2026-05-17
+
+Reconciliation pass against the sibling-CLI specs **plus** a doc fix for the
+`npx` invocation published with v0.1.0. No behavior change for existing
+inputs; one new accepted input (`status: "converged"` at the top level of
+`negotiation.json`) and a new internal spec doc.
+
+### Fixed
+
+- **`npx` invocation in README.md and GETTING_STARTED.md.** The published
+  v0.1.0 docs advertised `npx compare-cli@latest --demo`, which fails with
+  `sh: compare: command not found` (exit 127) because the package name
+  (`compare-cli`) and bin name (`compare`) differ, and npm 10.x's `npx`
+  does not auto-resolve a single bin in that case. Updated both docs to
+  `npx -p compare-cli@latest -- compare --demo`. No code change; the global
+  install (`npm install -g compare-cli && compare --version`) was always
+  fine and remains the recommended path.
+
+### Added
+
+- **`negotiation.json` reader recognizes the top-level `status` field.** When
+  `status` is one of `"converged"`, `"signed_off"`, or `"finalized"` (the
+  three states in `nda-review-cli`'s [state-file
+  reference](https://github.com/DrBaher/nda-review-cli/blob/main/docs/reference/state-file.md)
+  that mean "agreement is reached and stable"), the **last round's `text`**
+  is taken as the agreed base. This is the authoritative signal that
+  `nda-review-cli` itself uses to compute convergence; reading it directly
+  avoids re-deriving from per-round `clause_status`.
+- **[`docs/clause-detection.md`](./docs/clause-detection.md)** — extracted
+  the H2 / bold-prefix / ALL-CAPS / synthetic cascade as a portable,
+  language-agnostic spec. Cited by `compare-cli.mjs` and ARCHITECTURE.md.
+  template-vault-CLI is expected to cite the same doc in a follow-up PR
+  there.
+- **Clause-detection golden test** (`tests/test_clauses.mjs` → "rule
+  golden" suite) pinning each tier's regex, the precedence (H2 wins over
+  bold-prefix wins over ALL-CAPS, synthetic only if all three are empty),
+  and `isAllCapsHeading`'s corner cases. The test will fail loudly if the
+  rule drifts.
+
+### Changed
+
+- **`negotiation.json` reader: resolution order is now three-tier.** Priority
+  1 is the new top-level `status` check; priorities 2 and 3 are the existing
+  per-round `agreed: true` (minimum schema) and `clause_status` all-`"agreed"`
+  (de-facto schema) checks, unchanged. Error message updated to list all
+  three accepted forms.
+- **`COMPARE_SCHEMA.md` §9.2** rewritten for the three-tier resolution.
+- **`CHANGELOG.md` "Reconciliation debt" item 1** rewritten to reflect that
+  template-vault-CLI is published (v0.4.0) but is a Python CLI, not a
+  library importable from Node. The cross-language duplication is structural,
+  not an oversight. See item 1 in the updated "Reconciliation debt" section
+  on this release.
+
+### Reconciliation debt (updated)
+
+Replaces the section as written for 0.1.0.
+
+1. **Clause-detection rule maintained in two languages by design.**
+   `template-vault-CLI` (v0.4.0, Python) and `compare-cli` (Node) both ship
+   the H2 / bold-prefix / ALL-CAPS / synthetic cascade. There is no
+   language-neutral runtime they could share without forcing every user of
+   one CLI to also install the other's runtime. The rule itself is the
+   shared spec, now extracted as [docs/clause-detection.md](./docs/clause-detection.md).
+   **Reconciliation responsibility:** when the rule changes, both repos
+   ship coordinated PRs and bump the rule version in the spec doc.
+2. **`negotiation.json` schema convergence.** v0.1.1 reads three signals
+   (top-level `status: converged|signed_off|finalized`, per-round
+   `agreed: true`, per-round `clause_status` all `"agreed"`). The first
+   covers `nda-review-cli`'s authoritative output. The second is the
+   compare-cli minimum schema (useful for synthetic tests and non-nda
+   callers). The third is the historical `nda-review-cli` per-round signal
+   kept for back-compat. **Reconciliation responsibility:** if the suite
+   adopts a single shared schema doc, the reader can collapse to one signal
+   and any deprecated ones get removed with a major bump.
+
 ## 0.1.0 — 2026-05-17
 
 > **Package name decision (pre-publish).** Published as **`compare-cli`**

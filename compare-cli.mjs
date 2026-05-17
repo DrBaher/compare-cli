@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 // Constants
 // ----------------------------------------------------------------------------
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 // Stable exit codes. Documented in AGENTS.md and never re-numbered without a
 // major-version bump.
@@ -294,7 +294,9 @@ export async function extractPdfText(buf) {
 }
 
 // ----------------------------------------------------------------------------
-// Clause detection (mirrors template-vault-cli v0.3.0)
+// Clause detection — implements docs/clause-detection.md rule v1.0
+// (also implemented by template-vault-CLI v0.4.0 in Python; both must update
+// in lockstep when the rule changes).
 // ----------------------------------------------------------------------------
 
 export function detectClauses(text) {
@@ -489,7 +491,13 @@ function longestIncreasingSubsequenceIndices(arr) {
 
 // ----------------------------------------------------------------------------
 // negotiation.json reader (--from-negotiation)
+// See COMPARE_SCHEMA.md §9 for the three-tier resolution.
 // ----------------------------------------------------------------------------
+
+// nda-review-cli statuses that mean "agreement is reached and stable" and
+// therefore the latest round's text is the agreed base. See
+// https://github.com/DrBaher/nda-review-cli/blob/main/docs/reference/state-file.md
+const AGREED_TOP_LEVEL_STATUSES = new Set(["converged", "signed_off", "finalized"]);
 
 export function readNegotiation(path, { readFile = readFileSync, exists = existsSync } = {}) {
   if (!exists(path)) {
@@ -504,6 +512,15 @@ export function readNegotiation(path, { readFile = readFileSync, exists = exists
   if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.rounds) || parsed.rounds.length === 0) {
     const e = new Error(`${path}: expected an object with a non-empty 'rounds' array`); e.exit = EXIT.IO; throw e;
   }
+  // Tier 1: top-level status — nda-review-cli's authoritative convergence signal.
+  if (typeof parsed.status === "string" && AGREED_TOP_LEVEL_STATUSES.has(parsed.status)) {
+    for (let i = parsed.rounds.length - 1; i >= 0; i--) {
+      const r = parsed.rounds[i];
+      if (typeof r === "object" && r !== null && typeof r.text === "string") return r.text;
+    }
+  }
+  // Tier 2 + 3: per-round signals — minimum schema (agreed: true) then
+  // historical de-facto fallback (clause_status all "agreed"), latest first.
   for (let i = parsed.rounds.length - 1; i >= 0; i--) {
     const r = parsed.rounds[i];
     if (typeof r !== "object" || r === null) continue;
@@ -516,8 +533,9 @@ export function readNegotiation(path, { readFile = readFileSync, exists = exists
   }
   const e = new Error(
     `--from-negotiation: no agreed round found in ${path}\n` +
-    `       (expected at least one round with agreed: true,\n` +
-    `        or clause_status with all values "agreed")`
+    `       (expected top-level status: "converged" | "signed_off" | "finalized",\n` +
+    `        or a round with agreed: true,\n` +
+    `        or a round with clause_status all "agreed")`
   );
   e.exit = EXIT.SUBSTANTIVE;
   throw e;

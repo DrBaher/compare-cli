@@ -47,8 +47,12 @@ npm install -g compare-cli
 Or run without installing:
 
 ```sh
-npx compare-cli@latest --demo
+npx -p compare-cli@latest -- compare --demo
 ```
+
+(The package is `compare-cli`; the installed command is `compare`. The
+`-p … -- compare` form tells `npx` which package to fetch and which bin
+to run, since the two names differ.)
 
 Requires Node ≥ 20. (Pinned by `pdfjs-dist@^5.7.284`, which we share with [sign-cli](https://github.com/DrBaher/sign-cli).)
 

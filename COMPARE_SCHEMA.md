@@ -329,30 +329,38 @@ needs and ignores everything else. Required shape:
 
 ### 9.2. "Latest agreed round" resolution
 
-`compare-cli` picks the BASE text using this resolution order:
+`compare-cli` picks the BASE text using this **three-tier** resolution order
+(first match wins):
 
-1. **Explicit-agreed mode**: walk `rounds` from last to first. The first
-   round with `agreed === true` wins; its `text` is BASE.
-2. **Fallback mode** (for the de-facto nda-review-cli release, which uses
-   `clause_status` instead of a per-round `agreed` boolean): walk from last
-   to first. A round counts as "agreed" if it has a `clause_status` object
-   and **every value** in that object equals the string `"agreed"`. The first
-   such round wins; its `text` is BASE.
-3. If neither mode finds an agreed round → **exit 2** with:
+1. **Top-level convergence status** (preferred — the signal `nda-review-cli`
+   itself uses): if `parsed.status` is one of `"converged"`, `"signed_off"`,
+   or `"finalized"`, the **last round's `text`** (highest-indexed round with
+   a string `text`) is BASE. These three states all mean "all clauses agreed
+   and stable" per nda-review-cli's [state-file
+   reference](https://github.com/DrBaher/nda-review-cli/blob/main/docs/reference/state-file.md).
+2. **Per-round explicit-agreed** (the minimum schema documented in §9.1):
+   walk `rounds` from last to first. The first round with `agreed === true`
+   wins; its `text` is BASE.
+3. **Per-round `clause_status` fallback** (historical compatibility with
+   pre-`status` nda-review-cli outputs): walk from last to first. A round
+   counts as "agreed" if it has a `clause_status` object and **every value**
+   in that object equals the string `"agreed"`. The first such round wins;
+   its `text` is BASE.
+4. If none of the three tiers finds an agreed round → **exit 2** with:
 
    ```
    error: --from-negotiation: no agreed round found in <PATH>
-          (expected at least one round with agreed: true,
-           or clause_status with all values "agreed")
+          (expected top-level status: "converged" | "signed_off" | "finalized",
+           or a round with agreed: true,
+           or a round with clause_status all "agreed")
    ```
 
-The fallback in (2) is documented honestly: the de-facto nda-review-cli
-schema is richer than the minimum compare-cli requires, and the minimum
-schema's `agreed: true` boolean does not exist there. The fallback lets v1
-compare-cli work against today's nda-review-cli releases without locking us
-to that schema. **This is the only piece of v1's design that's expected to
-be reconciled in v2 once template-vault-cli ships and a unified schema for
-the suite emerges.** See CHANGELOG.md "Reconciliation debt" section.
+Tier 1 was added in v0.1.1 as the authoritative reading. Tiers 2 and 3 are
+kept because tier 2 is the minimum schema documented in §9.1 (used by
+synthetic tests and any non-nda-review-cli caller), and tier 3 supports
+legacy state files emitted before `nda-review-cli` computed the top-level
+status. **Convergence on a single signal** (and removal of the now-
+redundant tiers) is tracked under CHANGELOG.md "Reconciliation debt".
 
 ### 9.3. Hash-chain verification (out of scope for v1)
 
@@ -534,18 +542,22 @@ Forward-compatibility hooks reserved in the spec:
 These are the design fuzzy points the brief told us to surface. Each is
 locked here; reconciliation tracked in CHANGELOG.md.
 
-1. **Clause detection duplicated from template-vault-cli.** template-vault-cli
-   is the canonical home of the H2 + bold-prefix + ALL-CAPS rule, but it
-   isn't published yet, so v1 re-implements the algorithm in this file.
-   Tracked under CHANGELOG.md "Reconciliation debt" → switch to a vendored
-   library or shell-out in v2.
-2. **`negotiation.json` minimum schema doesn't match the de-facto
-   nda-review-cli release.** The brief specified `{round, text, agreed}` per
-   round; nda-review-cli emits `{round, proposer, text, text_hash,
-   clause_status, ...}` with no per-round `agreed` boolean. §9.2 specifies
-   *both* readers (the minimum + a `clause_status: all "agreed"` fallback).
-   Tracked under CHANGELOG.md "Reconciliation debt" → unify when
-   nda-review-cli and compare-cli converge on a shared schema doc.
+1. **Clause-detection rule lives in two languages by design.**
+   `template-vault-CLI` (Python) is the conceptual home of the H2 +
+   bold-prefix + ALL-CAPS rule, but it's a CLI not an importable Node
+   library — and forcing a Python runtime on compare-cli users to share
+   code would be worse than the duplication. The rule itself is now
+   extracted as [docs/clause-detection.md](./docs/clause-detection.md), and
+   both repos implement against that spec. Tracked under CHANGELOG.md
+   "Reconciliation debt" → coordinate rule changes across both repos and
+   bump the spec version in lockstep.
+2. **`negotiation.json` reader accepts three signals for back-compat.**
+   §9.2 specifies the three-tier resolution: top-level `status: converged`
+   (preferred), per-round `agreed: true` (minimum schema), per-round
+   `clause_status` all `"agreed"` (historical fallback). Tracked under
+   CHANGELOG.md "Reconciliation debt" → collapse to a single signal when
+   the suite settles on one schema doc; removal of deprecated tiers will
+   require a major bump.
 3. **Cosmetic vs typographic boundary.** §5 and §6 fix the rule:
    *cosmetic survives whitespace + Unicode-presentation normalization;
    typographic additionally survives case + number-format normalization*.

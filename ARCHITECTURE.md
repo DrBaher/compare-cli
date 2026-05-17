@@ -117,7 +117,9 @@ mean the class boundary doesn't drift with implementation changes.
 ## Clause detection
 
 `detectClauses(text)` runs a four-tier cascade, returning `{ tier, clauses
-}`. The tiers mirror template-vault-cli v0.3.0:
+}`. The cascade is specified in
+[docs/clause-detection.md](./docs/clause-detection.md) (rule v1.0) — that
+doc is the source of truth; this section only summarizes:
 
 1. **H2** — `^##\s+(.+?)\s*$`
 2. **Bold-prefix** — `^\*\*(\d+(?:\.\d+)*\.?\s+.+?)\*\*\s*$`
@@ -126,17 +128,15 @@ mean the class boundary doesn't drift with implementation changes.
    one ≥ 4-letter token. Doesn't start with `[`.
 4. **Synthetic** — whole document as one clause titled `"Document"`.
 
-**Fallbacks fire only when the previous tier returns empty.** This is the
-key constraint from template-vault-cli: you can't have ALL-CAPS lines
-shadowing real H2 sections. If H2 finds even one clause, the H2 result is
-the answer; ALL-CAPS lines are interpreted as paragraph content.
+**Fallbacks fire only when the previous tier returns empty.** This prevents
+ALL-CAPS lines inside a structured H2 document from over-segmenting it. If
+H2 finds even one clause, ALL-CAPS lines are interpreted as paragraph
+content. The synthetic fallback exists so plaintext and unstructured
+inputs still compare.
 
-The synthetic fallback exists so plaintext and unstructured inputs still
-compare — the diff degrades to "the whole text differs in these ways"
-rather than erroring.
-
-Clause-detection logic is **duplicated** from template-vault-cli pending
-its publication. CHANGELOG.md's "Reconciliation debt" section tracks this.
+`template-vault-CLI` (Python, v0.4.0+) implements the same rule against
+the same spec. The duplication is structural (cross-language) — see
+CHANGELOG.md "Reconciliation debt" item 1.
 
 ## Alignment
 
