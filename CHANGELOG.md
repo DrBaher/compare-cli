@@ -12,6 +12,60 @@ and the project adheres to semantic versioning once it leaves 0.x.
 > only. See [`mcp/README.md`](./mcp/README.md) for `compare-cli-mcp` and
 > [`docs/mcp.md`](./docs/mcp.md) for the design contract.
 
+## 0.3.0 — 2026-05-17
+
+Minor: surface WordprocessingML track-changes metadata from `.docx` inputs.
+**Informational only** — TC presence does NOT change the exit-code
+classification (text-diff remains the source of truth in v0.3.x). A
+future version may use TC as ground truth where both sides have it.
+
+### Added
+
+- **`extractDocxTrackChanges(buf)`** — new exported function that parses
+  `<w:ins>` and `<w:del>` elements from `word/document.xml`. Returns a
+  flat list of `{ op: "ins" | "del", text, author, date }` in document
+  order. Robust to malformed input (non-zip / missing document.xml → empty
+  array, no throw).
+- **`readInput` on `.docx` populates `track_changes`** on the returned
+  side object. Non-docx inputs do not have this field (consumers should
+  treat missing as `[]`).
+- **`--json` output includes `base.track_changes` and
+  `candidate.track_changes`** as stable arrays. Always present on the
+  base/candidate side object — empty `[]` when the input isn't `.docx` or
+  has no TC. Each entry has shape `{ op, text, author, date }`.
+- **Human report surfaces TC** when either side has it: counts of
+  insertions / deletions and unique authors, as an addendum after the
+  per-clause differences block. Skipped when neither side has TC.
+- **`--why` surfaces TC counts** as `why: track_changes.base=N
+  track_changes.candidate=M` when at least one side has TC. Omitted when
+  both are zero, same posture as the clause-filter line.
+- **SARIF `runs[].invocations[].properties` includes `track_changes_base`
+  and `track_changes_candidate`** counts. CI dashboards can flag the
+  presence of pre-existing TC on either side without re-parsing.
+
+### Tests
+
+191 → 206 (added 15). New file `tests/test_track_changes.mjs` covers the
+unit parser, `readInput` integration, `--json` surface, human report,
+`--why` line, and SARIF properties. `tests/_helpers.mjs`'s `makeDocx`
+now supports inline TC ops in run arrays (`{type: "ins"|"del", text,
+author, date}`).
+
+### Out of scope for 0.3.0
+
+- **TC as ground truth.** If a substantive text-diff result conflicts
+  with what TC says, the current behavior reports the text-diff result.
+  A future version (v0.4.0?) may invert this: if `<w:ins>` / `<w:del>`
+  metadata exists, treat the per-op author/date as the authoritative
+  record of the change and use TC content to populate the diff payload
+  instead of re-deriving.
+- **Clause attribution.** TC ops are returned as a flat list; the agent
+  / human can correlate to clauses by matching the surrounding text. A
+  future version may add `clause_index` to each op.
+- **TC outside body paragraphs** (header / footer / footnotes / tables).
+  v0.3.0 only reads `word/document.xml`; the other parts are silently
+  skipped.
+
 ## 0.2.1 — 2026-05-17
 
 Patch: small polish on the v0.2.0 features (`--why` now surfaces filter
