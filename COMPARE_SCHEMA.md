@@ -430,7 +430,7 @@ is a major-version change:
 
 - Top: `ok`, `exit_class`, `exit_code`, `base`, `candidate`, `summary`, `differences`, `warnings`.
 - `base` / `candidate`: `path`, `format`, `lossiness`, `clauses_total`.
-- `summary`: `clauses_total`, `clauses_changed`, `clauses_moved`, `clauses_added`, `clauses_removed`, `differences` (sub-object with the six class counts).
+- `summary`: `clauses_total`, `clauses_changed`, `clauses_moved`, `clauses_added`, `clauses_removed`, `differences` (sub-object with the six class counts), `suppressed_by_filter` (count of differences dropped by `--only-clauses` / `--ignore-clauses`; added in v0.2.0).
 - `differences[].`: `class`, `clause_title`, `clause_index_base`, `clause_index_candidate`, `base`, `candidate`.
 
 ### 10.2. `exit_class` enumeration
@@ -450,6 +450,69 @@ human counts clauses).
 
 Sorted by `clause_index_base` ascending (with `null`s last). Tie-broken by
 `clause_index_candidate` ascending. Deterministic across runs.
+
+---
+
+### 10.5. Clause filters (`--only-clauses` / `--ignore-clauses`)
+
+Added in v0.2.0. Both flags accept a comma-separated list of
+case-insensitive substring patterns. Patterns match against the
+**normalized** clause title (numbering stripped via `normalizeTitle`).
+Application order:
+
+1. `--only-clauses` (if set): keep only differences whose clause title
+   matches at least one pattern.
+2. `--ignore-clauses` (if set): from the surviving set, drop any whose
+   clause title matches at least one pattern.
+
+The result is what feeds into exit-code classification *and* the
+`differences[]` array in `--json` / `--sarif`. The dropped count is
+reported as `summary.suppressed_by_filter`. The filters do **not** alter
+the per-side `clauses_total` (which still counts the structural totals).
+
+### 10.6. `--require-signoffs`
+
+Added in v0.2.0. Use only with `--from-negotiation`. The
+`negotiation.json` file must have a top-level `signoffs` object with
+**both** `signoffs.a` and `signoffs.b` as non-empty strings (per
+nda-review-cli's [state-file
+reference](https://github.com/DrBaher/nda-review-cli/blob/main/docs/reference/state-file.md)).
+If either is missing or empty: exit 2 with the message
+`--require-signoffs: <path> is not signed off by both parties`.
+
+Default behavior (without the flag) is unchanged — the reader returns
+the agreed text regardless of signoff state.
+
+### 10.7. `--sarif` output (SARIF v2.1.0)
+
+Added in v0.2.0. `--sarif` is mutually exclusive with `--json`. Output
+is a single SARIF v2.1.0 document on stdout. Each `differences[]` entry
+becomes one `runs[0].results[i]` with:
+
+- `ruleId`: `compare-cli.<class>` (e.g. `compare-cli.substantive`).
+- `level`: `error` for `substantive`; `warning` for `cosmetic` /
+  `typographic`; `note` for `added` / `removed` / `moved`.
+- `message.text`: `[<class>] <clause_title> — <short summary>`.
+- `locations[0]`: the candidate file (`file://` URI for absolute paths).
+- `relatedLocations[0]` (when applicable): the base file.
+
+Run-level metadata:
+
+- `tool.driver.name`: `compare-cli`.
+- `tool.driver.version`: the running version (e.g. `0.2.0`).
+- `invocations[0].exitCode`: the compare-cli exit code (0/2/3/4).
+- `invocations[0].properties.exit_class`: the exit-class enum value.
+- `invocations[0].properties.suppressed_by_filter`: count dropped by clause filters.
+
+Designed for `github/codeql-action/upload-sarif@v3` — substantive
+differences surface as inline PR annotations in the GitHub review UI.
+
+### 10.8. `--check`
+
+Added in v0.2.0. Suppresses all output (both stdout and stderr). Implies
+`--silent`. The exit code (0/1/2/3/4) is the only output. `--output`
+writes are skipped under `--check` (the caller has declared they only
+care about the exit code).
 
 ---
 
