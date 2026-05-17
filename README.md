@@ -50,7 +50,7 @@ Or run without installing:
 npx @drbaher/compare-cli@latest --demo
 ```
 
-Requires Node ≥ 18.
+Requires Node ≥ 20. (Pinned by `pdfjs-dist@^5.7.284`, which we share with [sign-cli](https://github.com/DrBaher/sign-cli).)
 
 ## 30-second first run
 

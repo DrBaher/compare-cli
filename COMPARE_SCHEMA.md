@@ -16,7 +16,7 @@ Posture and shape match.
 
 ## 1. Stack & posture
 
-- **Single-file Node.js CLI** (`compare-cli.mjs`). ESM. Node ≥ 18. MIT.
+- **Single-file Node.js CLI** (`compare-cli.mjs`). ESM. Node ≥ 20 (pinned upward by `pdfjs-dist@^5.7.284`, which formally requires `>=22.13` but works at runtime on Node 20). MIT.
 - **Runtime dependencies — exactly two, both reused from the suite:**
   - `jszip ^3.10.1` — `.docx` extraction (same pin as draft-cli).
   - `pdfjs-dist ^5.7.284` — `.pdf` extraction (same major as sign-cli).
