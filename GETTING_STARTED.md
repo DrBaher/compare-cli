@@ -16,7 +16,7 @@ Or run without installing:
 npx @drbaher/compare-cli@latest --demo
 ```
 
-Requires Node ≥ 18.
+Requires Node ≥ 20.
 
 ## 2. The 30-second demo
 

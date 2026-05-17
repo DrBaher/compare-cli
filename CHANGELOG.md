@@ -6,6 +6,14 @@ and the project adheres to semantic versioning once it leaves 0.x.
 
 ## 0.1.0 — 2026-05-17
 
+> **Runtime baseline correction.** The original brief targeted Node ≥ 18,
+> but `pdfjs-dist@^5.7.284` (the pin we share with sign-cli for suite-wide
+> alignment) declares `engines.node: ">=22.13.0 || >=24"` and `npm ci`
+> fails on Node 18. Node 20 satisfies pdfjs at runtime even though it
+> doesn't formally satisfy the engines string, so the published baseline
+> is **Node ≥ 20**; the CI matrix is `[20, 22]`. Suite-wide alignment
+> with sign-cli on the pdfjs pin won the trade-off.
+
 Initial release. Single-file Node.js CLI for clause-aware drift detection
 between two contract versions. Part of the contract-operations suite
 ([cli.drbaher.com](https://cli.drbaher.com)).

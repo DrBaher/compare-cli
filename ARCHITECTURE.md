@@ -3,6 +3,16 @@
 A walk-through of how `compare-cli` is shaped and why. Read this before
 contributing — it explains the constraints that drove the design.
 
+## Runtime baseline
+
+Node ≥ 20. The hard pin upward is `pdfjs-dist@^5.7.284`, which declares
+`engines.node: ">=22.13.0 || >=24"` but works at runtime on Node 20. We
+keep Node 20 in the CI matrix to widen reach; Node 22 is the formally
+supported lower bound for the pdfjs path. Node 18 was the original
+brief target but cannot satisfy the pdfjs pin; the suite-wide alignment
+with sign-cli (which is also on `pdfjs-dist@^5.7.284`) won that
+trade-off.
+
 ## Single-file CLI
 
 `compare-cli.mjs` is one file. Helpers, detection, classification, the
