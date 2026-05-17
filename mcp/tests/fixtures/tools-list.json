@@ -1,0 +1,393 @@
+[
+  {
+    "name": "compare_files",
+    "description": "Compare two contract documents and return clause-aware drift classification. Returns the same structured report as `compare --json`. Substantive drift returns a successful response with exit_class='substantive'; it is NOT an MCP error.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "base": {
+          "type": "object",
+          "oneOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "content_base64"
+              ]
+            },
+            {
+              "required": [
+                "content_text"
+              ]
+            }
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Server reads this path with the process's privileges. Operators running this server for an unattended agent should restrict the working directory via COMPARE_MCP_BASE_DIR or run the server under a least-privileged user."
+            },
+            "content_base64": {
+              "type": "string",
+              "description": "Base64-encoded bytes. Required for .docx / .pdf inline."
+            },
+            "content_text": {
+              "type": "string",
+              "description": "UTF-8 text. Convenience channel for md/txt inputs."
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "docx",
+                "pdf",
+                "md",
+                "txt"
+              ],
+              "description": "Required with content_base64. With content_text, optional (default 'txt')."
+            }
+          }
+        },
+        "candidate": {
+          "type": "object",
+          "oneOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "content_base64"
+              ]
+            },
+            {
+              "required": [
+                "content_text"
+              ]
+            }
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Server reads this path with the process's privileges. Operators running this server for an unattended agent should restrict the working directory via COMPARE_MCP_BASE_DIR or run the server under a least-privileged user."
+            },
+            "content_base64": {
+              "type": "string",
+              "description": "Base64-encoded bytes. Required for .docx / .pdf inline."
+            },
+            "content_text": {
+              "type": "string",
+              "description": "UTF-8 text. Convenience channel for md/txt inputs."
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "docx",
+                "pdf",
+                "md",
+                "txt"
+              ],
+              "description": "Required with content_base64. With content_text, optional (default 'txt')."
+            }
+          }
+        },
+        "strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "Upgrade typographic drift to substantive."
+        },
+        "strict_cosmetic": {
+          "type": "boolean",
+          "default": false,
+          "description": "Upgrade cosmetic drift to substantive."
+        },
+        "only_clauses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Case-insensitive substring patterns matched against normalized clause titles; keep only matches."
+        },
+        "ignore_clauses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Same semantics as only_clauses but exclusion. Composes with only_clauses (ignore runs after)."
+        },
+        "include_human_report": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also return the human-readable report as a second text content block."
+        }
+      },
+      "required": [
+        "base",
+        "candidate"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "description": "compare-cli --json report shape (stable across v1.x). See AGENTS.md and COMPARE_SCHEMA.md §10.",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "exit_class": {
+          "type": "string",
+          "enum": [
+            "clean",
+            "cosmetic",
+            "typographic",
+            "substantive",
+            "moved"
+          ]
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "base": {
+          "type": "object"
+        },
+        "candidate": {
+          "type": "object"
+        },
+        "summary": {
+          "type": "object"
+        },
+        "differences": {
+          "type": "array"
+        },
+        "warnings": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "ok",
+        "exit_class",
+        "exit_code",
+        "base",
+        "candidate",
+        "summary",
+        "differences",
+        "warnings"
+      ]
+    }
+  },
+  {
+    "name": "compare_with_negotiation",
+    "description": "Compare a candidate document against the agreed text in an nda-review-cli negotiation.json. Three-tier resolution (status: converged|signed_off|finalized → per-round agreed: true → per-round clause_status all 'agreed'). Returns the structured report with `base.negotiation_resolution` indicating which signal produced the agreed text. NO_AGREED_ROUND surfaces as an MCP error (a precondition failure, not drift).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "negotiation": {
+          "type": "object",
+          "oneOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "content_json"
+              ]
+            }
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to negotiation.json. Same security note as compare_files.base.path."
+            },
+            "content_json": {
+              "type": "object",
+              "description": "Inline negotiation object (already parsed)."
+            }
+          }
+        },
+        "candidate": {
+          "type": "object",
+          "oneOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "content_base64"
+              ]
+            },
+            {
+              "required": [
+                "content_text"
+              ]
+            }
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Server reads this path with the process's privileges. Operators running this server for an unattended agent should restrict the working directory via COMPARE_MCP_BASE_DIR or run the server under a least-privileged user."
+            },
+            "content_base64": {
+              "type": "string",
+              "description": "Base64-encoded bytes. Required for .docx / .pdf inline."
+            },
+            "content_text": {
+              "type": "string",
+              "description": "UTF-8 text. Convenience channel for md/txt inputs."
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "docx",
+                "pdf",
+                "md",
+                "txt"
+              ],
+              "description": "Required with content_base64. With content_text, optional (default 'txt')."
+            }
+          }
+        },
+        "strict": {
+          "type": "boolean",
+          "default": false
+        },
+        "strict_cosmetic": {
+          "type": "boolean",
+          "default": false
+        },
+        "require_signoffs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Agents invoking this tool in unattended pipelines (no human reviewer downstream) should pass require_signoffs: true. Treats a negotiation lacking per-clause signoff metadata as a precondition failure rather than as substantive drift."
+        },
+        "only_clauses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignore_clauses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "include_human_report": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "negotiation",
+        "candidate"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "description": "compare-cli --json report shape (stable across v1.x). See AGENTS.md and COMPARE_SCHEMA.md §10.",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "exit_class": {
+          "type": "string",
+          "enum": [
+            "clean",
+            "cosmetic",
+            "typographic",
+            "substantive",
+            "moved"
+          ]
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "base": {
+          "type": "object"
+        },
+        "candidate": {
+          "type": "object"
+        },
+        "summary": {
+          "type": "object"
+        },
+        "differences": {
+          "type": "array"
+        },
+        "warnings": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "ok",
+        "exit_class",
+        "exit_code",
+        "base",
+        "candidate",
+        "summary",
+        "differences",
+        "warnings"
+      ]
+    }
+  },
+  {
+    "name": "compare_demo",
+    "description": "Run a zero-argument synthetic comparison against bundled fixtures. Deterministically returns exit_class='substantive' (the fixtures contain a Term-clause change). Use to confirm the server is wired up end-to-end without constructing a fixture.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "description": "compare-cli --json report shape (stable across v1.x). See AGENTS.md and COMPARE_SCHEMA.md §10.",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "exit_class": {
+          "type": "string",
+          "enum": [
+            "clean",
+            "cosmetic",
+            "typographic",
+            "substantive",
+            "moved"
+          ]
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "base": {
+          "type": "object"
+        },
+        "candidate": {
+          "type": "object"
+        },
+        "summary": {
+          "type": "object"
+        },
+        "differences": {
+          "type": "array"
+        },
+        "warnings": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "ok",
+        "exit_class",
+        "exit_code",
+        "base",
+        "candidate",
+        "summary",
+        "differences",
+        "warnings"
+      ]
+    }
+  }
+]

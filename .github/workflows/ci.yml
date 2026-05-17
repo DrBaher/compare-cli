@@ -23,6 +23,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: workspace tests (compare-cli-mcp)
+        working-directory: mcp
+        run: node --test tests/test_*.mjs
 
   coverage:
     name: coverage (line ≥ 80%)

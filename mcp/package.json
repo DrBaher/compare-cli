@@ -1,0 +1,48 @@
+{
+  "name": "compare-cli-mcp",
+  "version": "0.1.0",
+  "description": "MCP (Model Context Protocol) server wrapping compare-cli for agent pipelines. Three tools: compare_files, compare_with_negotiation, compare_demo. Stdio transport. Part of cli.drbaher.com contract-CLI suite.",
+  "type": "module",
+  "bin": {
+    "compare-mcp": "./compare-cli-mcp.mjs"
+  },
+  "main": "./compare-cli-mcp.mjs",
+  "exports": {
+    ".": "./compare-cli-mcp.mjs"
+  },
+  "files": [
+    "compare-cli-mcp.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test tests/test_*.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "legal",
+    "contracts",
+    "compare",
+    "drift"
+  ],
+  "author": "DrBaher",
+  "license": "MIT",
+  "homepage": "https://github.com/DrBaher/compare-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DrBaher/compare-cli.git",
+    "directory": "mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/DrBaher/compare-cli/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "peerDependencies": {
+    "compare-cli": "^0.2.0"
+  }
+}

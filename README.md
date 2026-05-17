@@ -14,6 +14,8 @@ compare negotiated.docx ready-to-sign.pdf
 
 Part of the [contract-operations suite](https://cli.drbaher.com).
 
+> **Agent pipelines:** see [`mcp/README.md`](./mcp/README.md) for `compare-cli-mcp`, the MCP server wrapping this CLI. Three tools (`compare_files`, `compare_with_negotiation`, `compare_demo`), stdio transport, JSON-first responses. Design contract: [`docs/mcp.md`](./docs/mcp.md).
+
 ---
 
 ## Why
