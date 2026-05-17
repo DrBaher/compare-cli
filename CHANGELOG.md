@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. The
 format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to semantic versioning once it leaves 0.x.
 
+> **Repo workspaces (2026-05-17).** This repo now hosts two npm packages
+> via [npm workspaces](https://docs.npmjs.com/cli/v10/using-npm/workspaces):
+> the existing `compare-cli` at the root, and a new `compare-cli-mcp` in
+> [`mcp/`](./mcp/) (MCP server wrapping the CLI for agent pipelines).
+> The two packages version independently — entries below cover **compare-cli**
+> only. See [`mcp/README.md`](./mcp/README.md) for `compare-cli-mcp` and
+> [`docs/mcp.md`](./docs/mcp.md) for the design contract.
+
 ## 0.2.1 — 2026-05-17
 
 Patch: small polish on the v0.2.0 features (`--why` now surfaces filter
