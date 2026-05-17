@@ -12,7 +12,8 @@
   },
   "files": [
     "compare-cli-mcp.mjs",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node --test tests/test_*.mjs"
