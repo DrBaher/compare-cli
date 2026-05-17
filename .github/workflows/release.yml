@@ -26,7 +26,14 @@ jobs:
             const fs = require("fs");
             const tag = process.argv[1];
             const md = fs.readFileSync("CHANGELOG.md", "utf8");
-            const re = new RegExp("^## " + tag.replace(/[.]/g, "\\\\.") + "(?:[\\s—]|$)", "m");
+            // Escape dots in the version for the regex. Intent is
+            // /^## 0\.2\.1(?:[\s—]|$)/m; in the single-quoted node -e here
+            // each backslash is literal, so we write "\\." in the JS source
+            // (a 2-char string: backslash + dot = an escaped dot in regex).
+            // The earlier "\\\\." was a 3-char string "\\." that the regex
+            // engine read as "escaped backslash + any char", never matching
+            // a real CHANGELOG header. v0.2.1 release.yml run failed on this.
+            const re = new RegExp("^## " + tag.replace(/[.]/g, "\\.") + "(?:[\\s—]|$)", "m");
             const start = md.search(re);
             if (start === -1) {
               console.error("no CHANGELOG section for " + tag);
