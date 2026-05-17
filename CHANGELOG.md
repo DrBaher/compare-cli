@@ -6,9 +6,21 @@ and the project adheres to semantic versioning once it leaves 0.x.
 
 ## 0.1.1 — 2026-05-17
 
-Reconciliation pass against the sibling-CLI specs. No behavior change for
-existing inputs; one new accepted input (`status: "converged"` at the top
-level of `negotiation.json`) and a new internal spec doc.
+Reconciliation pass against the sibling-CLI specs **plus** a doc fix for the
+`npx` invocation published with v0.1.0. No behavior change for existing
+inputs; one new accepted input (`status: "converged"` at the top level of
+`negotiation.json`) and a new internal spec doc.
+
+### Fixed
+
+- **`npx` invocation in README.md and GETTING_STARTED.md.** The published
+  v0.1.0 docs advertised `npx compare-cli@latest --demo`, which fails with
+  `sh: compare: command not found` (exit 127) because the package name
+  (`compare-cli`) and bin name (`compare`) differ, and npm 10.x's `npx`
+  does not auto-resolve a single bin in that case. Updated both docs to
+  `npx -p compare-cli@latest -- compare --demo`. No code change; the global
+  install (`npm install -g compare-cli && compare --version`) was always
+  fine and remains the recommended path.
 
 ### Added
 
