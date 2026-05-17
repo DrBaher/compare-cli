@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file. The
 format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to semantic versioning once it leaves 0.x.
 
+## 0.1.1 — 2026-05-17
+
+### Fixed
+
+- **`npx` invocation in README.md and GETTING_STARTED.md.** The published
+  v0.1.0 docs advertised `npx compare-cli@latest --demo`, which fails with
+  `sh: compare: command not found` (exit 127) because the package name
+  (`compare-cli`) and bin name (`compare`) differ, and npm 10.x's `npx`
+  does not auto-resolve a single bin in that case. Updated both docs to
+  `npx -p compare-cli@latest -- compare --demo`, which works against
+  npm 10.x / Node 20+. No code change, no behavior change; the runtime,
+  exit-code contract, JSON shape, and `--why` output are byte-identical
+  to 0.1.0. Bin name remains `compare` — the global install
+  (`npm install -g compare-cli && compare --version`) is unchanged.
+
 ## 0.1.0 — 2026-05-17
 
 > **Package name decision (pre-publish).** Published as **`compare-cli`**

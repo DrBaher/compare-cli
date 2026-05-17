@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 // Constants
 // ----------------------------------------------------------------------------
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 // Stable exit codes. Documented in AGENTS.md and never re-numbered without a
 // major-version bump.

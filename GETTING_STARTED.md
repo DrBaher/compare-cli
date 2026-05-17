@@ -13,8 +13,11 @@ compare --version
 Or run without installing:
 
 ```sh
-npx compare-cli@latest --demo
+npx -p compare-cli@latest -- compare --demo
 ```
+
+The package name (`compare-cli`) differs from the bin name (`compare`),
+so `npx` needs `-p <package> -- <bin>` to disambiguate.
 
 Requires Node ≥ 20.
 
