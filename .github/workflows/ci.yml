@@ -1,0 +1,73 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: test (${{ matrix.os }} / node ${{ matrix.node-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: ['18', '20', '22']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  coverage:
+    name: coverage (line ≥ 80%)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: run coverage
+        run: |
+          out=$(node --test --experimental-test-coverage tests/test_*.mjs 2>&1)
+          echo "$out" | tail -40
+          line=$(echo "$out" | awk -F'|' '/compare-cli\.mjs/ { gsub(/ /,"",$2); print $2 }')
+          echo "line coverage: $line"
+          awk -v c="$line" 'BEGIN { exit !(c+0 >= 80) }' \
+            || { echo "::error::line coverage ${line}% < 80%"; exit 1; }
+
+  smoke:
+    name: smoke (pack + install + run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm pack
+      - name: install the just-built tarball globally
+        run: |
+          tarball=$(ls -1t ./*.tgz | head -n1)
+          npm install -g "$tarball"
+      - name: assert the bin actually runs
+        run: |
+          out=$(compare --version)
+          echo "version output: $out"
+          [[ "$out" == compare-cli* ]] || { echo "::error::compare --version produced unexpected output: '$out'"; exit 1; }
+          # --demo is a deliberate substantive-drift fixture, so exit code 2
+          # is expected here. The contract is "the bin runs and emits a report".
+          set +e
+          demo=$(compare --demo --json)
+          status=$?
+          set -e
+          [[ "$status" == 2 ]] || { echo "::error::compare --demo exited $status; expected 2 (substantive fixture)"; exit 1; }
+          echo "$demo" | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8")); if (j.exit_class !== "substantive") { console.error("demo did not report substantive drift"); process.exit(1); }'
