@@ -41,13 +41,13 @@ cross-format comparisons (negotiated `.docx` vs ready-to-sign `.pdf`).
 ## Install
 
 ```sh
-npm install -g @drbaher/compare-cli
+npm install -g compare-cli
 ```
 
 Or run without installing:
 
 ```sh
-npx @drbaher/compare-cli@latest --demo
+npx compare-cli@latest --demo
 ```
 
 Requires Node ≥ 20. (Pinned by `pdfjs-dist@^5.7.284`, which we share with [sign-cli](https://github.com/DrBaher/sign-cli).)

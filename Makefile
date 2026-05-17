@@ -27,7 +27,7 @@ install:
 
 smoke: build
 	version=$$(node -p "require('./package.json').version"); \
-	  npm install -g "./drbaher-compare-cli-$${version}.tgz"
+	  npm install -g "./compare-cli-$${version}.tgz"
 	compare --version
 	compare --demo --json > /dev/null || true
 	@echo "smoke ok"

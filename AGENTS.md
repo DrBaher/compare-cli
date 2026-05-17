@@ -219,7 +219,7 @@ import {
   readInput, extractDocxText, extractPdfText,
   readNegotiation,
   EXIT, VERSION, main,
-} from "@drbaher/compare-cli";
+} from "compare-cli";
 ```
 
 `main(argv, io)` accepts an argv array and an `io = { out, err, env,
