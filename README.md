@@ -1,5 +1,10 @@
 # compare-cli
 
+[![npm version](https://img.shields.io/npm/v/compare-cli.svg)](https://www.npmjs.com/package/compare-cli)
+[![CI](https://github.com/DrBaher/compare-cli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/DrBaher/compare-cli/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node ≥ 20](https://img.shields.io/node/v/compare-cli.svg)](https://nodejs.org/)
+
 > Clause-aware drift detection between two contract versions. Pre-signature
 > gate for legal teams and agent pipelines. Single-file Node CLI, two runtime
 > deps, deterministic by design, no LLM tier in v1.

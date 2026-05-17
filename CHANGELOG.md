@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file. The
 format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project adheres to semantic versioning once it leaves 0.x.
 
+## 0.2.1 — 2026-05-17
+
+Patch: small polish on the v0.2.0 features (`--why` now surfaces filter
+state; SARIF emits valid Windows-path URIs) plus a CI/infra workflow for
+GitHub Releases auto-generation. No behavior change to existing inputs;
+two narrow follow-ups + one new workflow.
+
+### Added
+
+- **GitHub Releases workflow.** New `.github/workflows/release.yml` fires on
+  every `v*` tag push and creates a GitHub Release object whose body is
+  the matching `## <version>` section verbatim from `CHANGELOG.md`. Runs
+  in parallel with `publish.yml` — they're independent (a release-yml
+  failure doesn't block npm publish, and vice versa). Future tags get
+  GitHub Releases automatically; the existing v0.1.0 / v0.1.1 / v0.2.0
+  tags are backfilled manually via `gh release create` after this lands.
+- **README badges:** npm version, CI status, license, Node engine
+  range. Cheap, increases discoverability.
+
+### Changed
+
+- **`--why` block surfaces clause-filter state** when `--only-clauses` or
+  `--ignore-clauses` is set, or when something was actually suppressed:
+  `why: filter.only_clauses=term|payment filter.ignore_clauses=- filter.suppressed=3`.
+  Omitted when no filters set and nothing suppressed, so it doesn't add
+  noise to runs that don't use the feature.
+- **SARIF `pathToFileUri` handles Windows absolute paths.** Was missing
+  this case in v0.2.0 — `C:\Users\alice\foo.docx` now becomes
+  `file:///C:/Users/alice/foo.docx` per the file-URI scheme. Relative
+  paths still pass through unchanged (SARIF v2.1.0 allows). The function
+  is now exported for direct testing.
+
+### Repo infrastructure (one-time, not in the PR diff)
+
+- **Repo description set** to the one-paragraph elevator pitch from
+  README.md + suite link. Set via `gh api -X PATCH` (a settings change,
+  not a PR change).
+- **Branch protection enabled on `main`** — required status checks are
+  the six existing CI jobs (`test (ubuntu × node 20/22)`,
+  `test (macos × node 20/22)`, `coverage`, `smoke`). PRs cannot merge
+  until all six pass. Admin override remains available
+  (`enforce_admins=false`) for emergency hotfixes. Force-pushes and
+  branch deletion both blocked.
+
+### Tests
+
+186 → 191 (added 5: three `--why` filter-info cases, two SARIF
+Windows-path cases).
+
 ## 0.2.0 — 2026-05-17
 
 Minor: six new flags / output behaviors, no breaking changes. Drives

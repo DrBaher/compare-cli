@@ -1,0 +1,50 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Creates a GitHub Release object for each pushed v* tag, with the body
+# extracted verbatim from the matching ## <version> section in CHANGELOG.md.
+# Runs in parallel with publish.yml (which handles npm publish); both are
+# independent — failure of one does not block the other.
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Extract CHANGELOG section for this tag
+        id: extract
+        run: |
+          set -e
+          tag="${GITHUB_REF#refs/tags/v}"
+          node -e '
+            const fs = require("fs");
+            const tag = process.argv[1];
+            const md = fs.readFileSync("CHANGELOG.md", "utf8");
+            const re = new RegExp("^## " + tag.replace(/[.]/g, "\\\\.") + "(?:[\\s—]|$)", "m");
+            const start = md.search(re);
+            if (start === -1) {
+              console.error("no CHANGELOG section for " + tag);
+              process.exit(1);
+            }
+            const after = md.slice(start);
+            const next = after.indexOf("\n## ", 1);
+            const section = next === -1 ? after : after.slice(0, next);
+            // Drop the header line itself; the Release UI shows the title separately.
+            const body = section.replace(/^## [^\n]+\n+/, "");
+            fs.writeFileSync("/tmp/release-notes.md", body);
+          ' "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.extract.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --title "v${{ steps.extract.outputs.tag }}" \
+            --notes-file /tmp/release-notes.md
