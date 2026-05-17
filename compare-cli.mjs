@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 // Constants
 // ----------------------------------------------------------------------------
 
-export const VERSION = "0.2.1";
+export const VERSION = "0.3.0";
 
 // Stable exit codes. Documented in AGENTS.md and never re-numbered without a
 // major-version bump.
@@ -265,10 +265,12 @@ export async function readInput(path, opts = {}) {
     let buf;
     try { buf = readFileSync(path); }
     catch (err) { const e = new Error(`cannot read ${path}: ${err.message}`); e.exit = EXIT.IO; throw e; }
-    let text;
-    try { text = await extractDocxText(buf); }
-    catch (err) { const e = new Error(`malformed .docx: ${path} (${err.message})`); e.exit = EXIT.IO; throw e; }
-    return { path, text, format: "docx", lossiness: "none" };
+    let text, trackChanges = [];
+    try {
+      text = await extractDocxText(buf);
+      trackChanges = await extractDocxTrackChanges(buf);
+    } catch (err) { const e = new Error(`malformed .docx: ${path} (${err.message})`); e.exit = EXIT.IO; throw e; }
+    return { path, text, format: "docx", lossiness: "none", track_changes: trackChanges };
   }
   if (fmt === "pdf") {
     let buf;
@@ -313,6 +315,45 @@ export async function extractDocxText(buf) {
     paragraphs.push(runs.join(""));
   }
   return paragraphs.join("\n");
+}
+
+// Extract WordprocessingML track-changes ops from a .docx buffer.
+// Returns a flat list of { op: "ins"|"del", text, author, date } in document
+// order. Insertions (`<w:ins>`) and deletions (`<w:del>`) are returned in
+// document-order interleave, but the consumer should treat the list as
+// observational metadata rather than a temporal log — the spec doesn't
+// guarantee chronological order within a document.
+//
+// v1 surfaces TC as informational (alongside text-diff classification);
+// future versions may use TC as ground truth where both sides have it.
+export async function extractDocxTrackChanges(buf) {
+  const { default: JSZip } = await import("jszip");
+  let zip;
+  try { zip = await JSZip.loadAsync(buf); }
+  catch { return []; }  // not a valid zip → no TC
+  const docFile = zip.file("word/document.xml");
+  if (!docFile) return [];
+  const xml = await docFile.async("string");
+  const ops = [];
+  // Iterate <w:ins>...</w:ins> and <w:del>...</w:del> in document order.
+  // The author/date come from attributes on the wrapping element; the text
+  // content lives in <w:t> (for ins) or <w:delText> (for del) nested inside.
+  const blockRe = /<w:(ins|del)\b([^>]*)>([\s\S]*?)<\/w:\1>/g;
+  let m;
+  while ((m = blockRe.exec(xml)) !== null) {
+    const op = m[1];
+    const attrs = m[2];
+    const inner = m[3];
+    const author = (attrs.match(/\bw:author="([^"]*)"/) || [])[1] || "";
+    const date = (attrs.match(/\bw:date="([^"]*)"/) || [])[1] || "";
+    const textTag = op === "del" ? "w:delText" : "w:t";
+    const textRe = new RegExp(`<${textTag}(?:\\s[^>]*)?>([\\s\\S]*?)</${textTag}>`, "g");
+    const parts = [];
+    let t;
+    while ((t = textRe.exec(inner)) !== null) parts.push(decodeXmlEntities(t[1]));
+    ops.push({ op, text: parts.join(""), author, date });
+  }
+  return ops;
 }
 
 function decodeXmlEntities(s) {
@@ -737,12 +778,18 @@ export function computeExitClass(differences, { strict = false, strictCosmetic =
 export function buildReportJson({ base, candidate, baseClauses, candClauses, differences, exitClass, exitCode, warnings, suppressedByFilter = 0 }) {
   const counts = { cosmetic: 0, typographic: 0, substantive: 0, added: 0, removed: 0, moved: 0 };
   for (const d of differences) counts[d.class] = (counts[d.class] || 0) + 1;
+  // Track-changes metadata flows through unchanged from readInput when the
+  // input is .docx and contained <w:ins> / <w:del> elements. Always an
+  // array — empty when the input has no TC or isn't .docx. v0.3.0 surfaces
+  // as informational; future versions may use it for classification.
+  const baseTc = Array.isArray(base.track_changes) ? base.track_changes : [];
+  const candTc = Array.isArray(candidate.track_changes) ? candidate.track_changes : [];
   return {
     ok: exitCode === EXIT.OK,
     exit_class: exitClass,
     exit_code: exitCode,
-    base: { path: base.path, format: base.format, lossiness: base.lossiness, clauses_total: baseClauses.length },
-    candidate: { path: candidate.path, format: candidate.format, lossiness: candidate.lossiness, clauses_total: candClauses.length },
+    base: { path: base.path, format: base.format, lossiness: base.lossiness, clauses_total: baseClauses.length, track_changes: baseTc },
+    candidate: { path: candidate.path, format: candidate.format, lossiness: candidate.lossiness, clauses_total: candClauses.length, track_changes: candTc },
     summary: {
       clauses_total: Math.max(baseClauses.length, candClauses.length),
       clauses_changed: counts.cosmetic + counts.typographic + counts.substantive,
@@ -844,6 +891,8 @@ export function buildReportSarif(report) {
         properties: {
           exit_class: report.exit_class,
           suppressed_by_filter: report.summary.suppressed_by_filter || 0,
+          track_changes_base: (report.base.track_changes || []).length,
+          track_changes_candidate: (report.candidate.track_changes || []).length,
         },
       }],
       results,
@@ -999,6 +1048,27 @@ export function formatReportHuman(report, { stream, env = process.env, intraDiff
       }
     }
   }
+  // Track-changes summary — present on .docx with <w:ins>/<w:del> elements.
+  // Surface counts + authors as a one-block addendum; the verdict and class
+  // counts above are unchanged (TC is informational in v0.3.0).
+  const baseTcCount = (report.base.track_changes || []).length;
+  const candTcCount = (report.candidate.track_changes || []).length;
+  if (baseTcCount > 0 || candTcCount > 0) {
+    lines.push("");
+    lines.push(c("dim", "track-changes (Word):"));
+    const summary = (side, ops) => {
+      if (ops.length === 0) return null;
+      const ins = ops.filter((o) => o.op === "ins").length;
+      const del = ops.filter((o) => o.op === "del").length;
+      const authors = [...new Set(ops.map((o) => o.author).filter(Boolean))];
+      const auth = authors.length > 0 ? ` (authors: ${authors.join(", ")})` : "";
+      return `  ${side}:      ${ins} insertion(s), ${del} deletion(s)${auth}`;
+    };
+    const baseLine = summary("base    ", report.base.track_changes || []);
+    const candLine = summary("candidate", report.candidate.track_changes || []);
+    if (baseLine) lines.push(c("dim", baseLine));
+    if (candLine) lines.push(c("dim", candLine));
+  }
   if (report.warnings.length > 0) {
     lines.push("");
     for (const w of report.warnings) lines.push(c("yellow", `warning: ${w}`));
@@ -1040,6 +1110,11 @@ export function formatWhyBlock(report, opts) {
   const suppressed = report.summary.suppressed_by_filter || 0;
   if (only || ignore || suppressed > 0) {
     lines.push(`why: filter.only_clauses=${only || "-"} filter.ignore_clauses=${ignore || "-"} filter.suppressed=${suppressed}`);
+  }
+  const baseTc = (report.base.track_changes || []).length;
+  const candTc = (report.candidate.track_changes || []).length;
+  if (baseTc > 0 || candTc > 0) {
+    lines.push(`why: track_changes.base=${baseTc} track_changes.candidate=${candTc}`);
   }
   return lines.join("\n") + "\n";
 }

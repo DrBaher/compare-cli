@@ -429,7 +429,7 @@ The following keys are stable across v1.x; renaming or removing any of them
 is a major-version change:
 
 - Top: `ok`, `exit_class`, `exit_code`, `base`, `candidate`, `summary`, `differences`, `warnings`.
-- `base` / `candidate`: `path`, `format`, `lossiness`, `clauses_total`.
+- `base` / `candidate`: `path`, `format`, `lossiness`, `clauses_total`, `track_changes` (added in v0.3.0; `.docx` TC metadata, flat list of `{op, text, author, date}`, always present, empty `[]` when input isn't `.docx` or has no TC; informational only — see §10.9).
 - `summary`: `clauses_total`, `clauses_changed`, `clauses_moved`, `clauses_added`, `clauses_removed`, `differences` (sub-object with the six class counts), `suppressed_by_filter` (count of differences dropped by `--only-clauses` / `--ignore-clauses`; added in v0.2.0).
 - `differences[].`: `class`, `clause_title`, `clause_index_base`, `clause_index_candidate`, `base`, `candidate`.
 
@@ -513,6 +513,44 @@ Added in v0.2.0. Suppresses all output (both stdout and stderr). Implies
 `--silent`. The exit code (0/1/2/3/4) is the only output. `--output`
 writes are skipped under `--check` (the caller has declared they only
 care about the exit code).
+
+### 10.9. `track_changes` (.docx WordprocessingML metadata)
+
+Added in v0.3.0. For each side (`base` and `candidate`), the
+`track_changes` field is an array of TC operations parsed from
+`word/document.xml`'s `<w:ins>` and `<w:del>` elements, in document
+order. Shape per entry:
+
+```json
+{ "op": "ins" | "del", "text": "...", "author": "...", "date": "..." }
+```
+
+- `op` — `"ins"` (insertion) or `"del"` (deletion).
+- `text` — the inserted/deleted text content, with XML entities decoded.
+- `author` — value of the `w:author` attribute, or `""` if absent.
+- `date` — value of the `w:date` attribute (ISO 8601), or `""` if absent.
+
+**Always present.** Empty `[]` when the input is not `.docx` or has no
+TC ops. Consumers should treat missing/empty as "no TC information."
+
+**Informational only in v0.3.x.** TC presence does **not** change
+`exit_class` or `differences[]`. The text-diff path remains the source
+of truth — `extractDocxText` already includes `<w:ins>` content (it's
+part of the final document) and excludes `<w:del>` content (which has
+been deleted). TC metadata supplements that with author/date provenance.
+
+A future version may invert this: where both sides have TC, use the TC
+records as ground truth and populate `differences[]` from them. That's
+a v0.4.0+ change and will bump major if it alters `exit_class` semantics.
+
+Surfaces alongside `track_changes`:
+- Human report: a "track-changes (Word):" addendum block summarizing
+  insertion / deletion counts and unique authors (when at least one side
+  has TC).
+- `--why`: a `why: track_changes.base=N track_changes.candidate=M` line
+  (when at least one side has non-zero TC).
+- `--sarif`: `runs[].invocations[].properties.track_changes_base` and
+  `track_changes_candidate` carry the counts.
 
 ---
 

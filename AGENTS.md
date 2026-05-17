@@ -37,13 +37,15 @@ stderr regardless of `--silent`.
     "path": "negotiated.docx",
     "format": "docx",
     "lossiness": "none",
-    "clauses_total": 12
+    "clauses_total": 12,
+    "track_changes": []
   },
   "candidate": {
     "path": "ready-to-sign.pdf",
     "format": "pdf",
     "lossiness": "extracted",
-    "clauses_total": 12
+    "clauses_total": 12,
+    "track_changes": []
   },
   "summary": {
     "clauses_total": 12,
@@ -73,7 +75,11 @@ without a major-version bump:
 
 - Top level: `ok`, `exit_class`, `exit_code`, `base`, `candidate`, `summary`,
   `differences`, `warnings`
-- Per `base` / `candidate`: `path`, `format`, `lossiness`, `clauses_total`
+- Per `base` / `candidate`: `path`, `format`, `lossiness`, `clauses_total`,
+  `track_changes` (added in v0.3.0; `.docx` `<w:ins>` / `<w:del>` metadata as
+  a flat list of `{op, text, author, date}`; always present, empty `[]` for
+  non-docx inputs or docs without TC; **informational only — does not affect
+  `exit_class`**)
 - Per `summary`: `clauses_total`, `clauses_changed`, `clauses_moved`,
   `clauses_added`, `clauses_removed`, `differences`, `suppressed_by_filter`
   (added in v0.2.0; counts differences dropped by `--only-clauses` /

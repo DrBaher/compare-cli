@@ -44,16 +44,25 @@ export async function makeDocx(dir, name, paragraphs) {
 }
 
 function buildDocumentXml(paragraphs) {
+  let nextId = 1;
+  const xmlEscape = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const paras = paragraphs.map((p) => {
-    const runs = Array.isArray(p) ? p : [{ text: p }];
-    const runXml = runs.map((r) => {
-      const safe = String(r.text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-      return `<w:r><w:t xml:space="preserve">${safe}</w:t></w:r>`;
+    const items = Array.isArray(p) ? p : [{ text: p }];
+    const itemXml = items.map((item) => {
+      // Track-changes insertion: { type: "ins", text, author?, date? }
+      if (item.type === "ins") {
+        const safe = xmlEscape(item.text);
+        return `<w:ins w:id="${nextId++}" w:author="${xmlEscape(item.author || "")}" w:date="${xmlEscape(item.date || "")}"><w:r><w:t xml:space="preserve">${safe}</w:t></w:r></w:ins>`;
+      }
+      // Track-changes deletion: { type: "del", text, author?, date? }
+      if (item.type === "del") {
+        const safe = xmlEscape(item.text);
+        return `<w:del w:id="${nextId++}" w:author="${xmlEscape(item.author || "")}" w:date="${xmlEscape(item.date || "")}"><w:r><w:delText xml:space="preserve">${safe}</w:delText></w:r></w:del>`;
+      }
+      // Plain run
+      return `<w:r><w:t xml:space="preserve">${xmlEscape(item.text)}</w:t></w:r>`;
     }).join("");
-    return `<w:p>${runXml}</w:p>`;
+    return `<w:p>${itemXml}</w:p>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
