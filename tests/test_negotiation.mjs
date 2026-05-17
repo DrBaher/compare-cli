@@ -146,3 +146,101 @@ test("end-to-end: --from-negotiation with no agreed round → exit 2 with clear 
   assert.equal(code, EXIT.SUBSTANTIVE);
   assert.match(err, /no agreed round/);
 });
+
+// ---------------------------------------------------------------------------
+// Tier 1 — top-level status (added in 0.1.1)
+// See COMPARE_SCHEMA.md §9.2 and docs/reference/state-file.md in nda-review-cli.
+// ---------------------------------------------------------------------------
+
+test("status: converged at top level → returns last round's text", () => {
+  const dir = tmp();
+  const path = makeFile(dir, "neg.json", JSON.stringify({
+    rounds: [
+      { round: 1, text: "earlier draft" },
+      { round: 2, text: "middle" },
+      { round: 3, text: AGREED_TEXT },
+    ],
+    status: "converged",
+  }));
+  assert.equal(readNegotiation(path), AGREED_TEXT);
+});
+
+test("status: signed_off → returns last round's text", () => {
+  const dir = tmp();
+  const path = makeFile(dir, "neg.json", JSON.stringify({
+    rounds: [{ round: 1, text: AGREED_TEXT }],
+    status: "signed_off",
+  }));
+  assert.equal(readNegotiation(path), AGREED_TEXT);
+});
+
+test("status: finalized → returns last round's text", () => {
+  const dir = tmp();
+  const path = makeFile(dir, "neg.json", JSON.stringify({
+    rounds: [{ round: 1, text: AGREED_TEXT }],
+    status: "finalized",
+  }));
+  assert.equal(readNegotiation(path), AGREED_TEXT);
+});
+
+test("status: converged beats per-round agreed: false (top-level signal wins)", () => {
+  const dir = tmp();
+  const path = makeFile(dir, "neg.json", JSON.stringify({
+    rounds: [
+      { round: 1, text: "first", agreed: false },
+      { round: 2, text: AGREED_TEXT, agreed: false },
+    ],
+    status: "converged",
+  }));
+  assert.equal(readNegotiation(path), AGREED_TEXT);
+});
+
+test("status: open → falls through to per-round resolution", () => {
+  const dir = tmp();
+  const path = makeFile(dir, "neg.json", JSON.stringify({
+    rounds: [
+      { round: 1, text: "first", agreed: false },
+      { round: 2, text: AGREED_TEXT, agreed: true },
+    ],
+    status: "open",
+  }));
+  assert.equal(readNegotiation(path), AGREED_TEXT);
+});
+
+test("status: blocked → falls through; if no per-round signal, exit 2", () => {
+  const dir = tmp();
+  const path = makeFile(dir, "neg.json", JSON.stringify({
+    rounds: [{ round: 1, text: "x", agreed: false }],
+    status: "blocked",
+  }));
+  assert.throws(
+    () => readNegotiation(path),
+    (e) => e.exit === EXIT.SUBSTANTIVE && /no agreed round/.test(e.message),
+  );
+});
+
+test("status: converged with no string-text rounds → falls through, error", () => {
+  // Defensive: if status says converged but every round's text is non-string,
+  // we don't fabricate one — fall through and error.
+  const dir = tmp();
+  const path = makeFile(dir, "neg.json", JSON.stringify({
+    rounds: [{ round: 1, text: null }],
+    status: "converged",
+  }));
+  assert.throws(
+    () => readNegotiation(path),
+    (e) => e.exit === EXIT.SUBSTANTIVE,
+  );
+});
+
+test("error message lists all three accepted forms", () => {
+  const dir = tmp();
+  const path = makeFile(dir, "neg.json", JSON.stringify({
+    rounds: [{ round: 1, text: "x", agreed: false }],
+  }));
+  assert.throws(() => readNegotiation(path), (e) => {
+    return /status: "converged"/.test(e.message)
+      && /agreed: true/.test(e.message)
+      && /clause_status all "agreed"/.test(e.message);
+  });
+});

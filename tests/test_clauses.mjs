@@ -154,3 +154,86 @@ Real body.`;
   assert.equal(tier, "h2");
   assert.equal(clauses.length, 1);
 });
+
+// ---------------------------------------------------------------------------
+// Rule golden — pins the exact behavior specified in docs/clause-detection.md
+// (rule v1.0). If any of these assertions break, the spec doc version must
+// bump and template-vault-CLI's equivalent test must be updated in lockstep.
+// ---------------------------------------------------------------------------
+
+test("rule golden: H2 regex — `##Title` (no space) does NOT match", () => {
+  // Tier 1 falls through; bold-prefix and ALL-CAPS also miss → synthetic.
+  const { tier, clauses } = detectClauses("##Title\n\nBody.");
+  assert.equal(tier, "synthetic");
+  assert.equal(clauses[0].title, "Document");
+});
+
+test("rule golden: H2 regex — trims trailing whitespace from title", () => {
+  const { clauses } = detectClauses("## Purpose   \n\nBody.");
+  assert.equal(clauses[0].title, "Purpose");
+});
+
+test("rule golden: bold-prefix regex — accepts `**N. Title**`, `**N.M Title**`, `**N. Title.**`", () => {
+  const text = "**1. A**\n\nx.\n\n**2.3 B**\n\ny.\n\n**4. C.**\n\nz.";
+  const { tier, clauses } = detectClauses(text);
+  assert.equal(tier, "bold-prefix");
+  assert.equal(clauses.length, 3);
+  assert.equal(clauses[0].title, "1. A");
+  assert.equal(clauses[1].title, "2.3 B");
+  assert.equal(clauses[2].title, "4. C.");
+});
+
+test("rule golden: bold-prefix regex — rejects `**Purpose**` (no number)", () => {
+  // Tier 2 returns empty → falls to ALL-CAPS, which also misses → synthetic.
+  const { tier } = detectClauses("**Purpose**\n\nBody.");
+  assert.equal(tier, "synthetic");
+});
+
+test("rule golden: bold-prefix regex — rejects `**1.**` (no title after number)", () => {
+  const { tier } = detectClauses("**1.**\n\nBody.");
+  assert.equal(tier, "synthetic");
+});
+
+test("rule golden: isAllCapsHeading — `1. DEFINITIONS` is a match (digits + letters)", () => {
+  // Digits and `.` are non-letter chars; the letters in DEFINITIONS are all
+  // uppercase, and the two-token rule applies.
+  assert.equal(isAllCapsHeading("1. DEFINITIONS"), true);
+});
+
+test("rule golden: isAllCapsHeading — single-token rule needs ≥4 letters", () => {
+  assert.equal(isAllCapsHeading("AB"), false);   // 2 letters
+  assert.equal(isAllCapsHeading("ABC"), false);  // 3 letters (1 token)
+  assert.equal(isAllCapsHeading("ABCD"), true);  // 4 letters (1 token) — boundary
+  assert.equal(isAllCapsHeading("A.B"), false);  // 2 letters even with punctuation
+});
+
+test("rule golden: tier precedence — H2 > bold-prefix > ALL-CAPS > synthetic", () => {
+  // Strict cascade: each later tier suppressed when earlier produces results.
+  assert.equal(detectClauses("## H2\n\nbody").tier, "h2");
+  assert.equal(detectClauses("**1. B**\n\nbody").tier, "bold-prefix");
+  assert.equal(detectClauses("CAPS WORDS\n\nbody").tier, "all-caps");
+  assert.equal(detectClauses("plain text").tier, "synthetic");
+});
+
+test("rule golden: title-to-body — content before first title is discarded", () => {
+  const text = "preamble line\n\n## First\n\nfirst body.\n\n## Second\n\nsecond body.";
+  const { clauses } = detectClauses(text);
+  assert.equal(clauses.length, 2);
+  assert.equal(clauses[0].title, "First");
+  // "preamble line" must NOT appear in any clause body.
+  assert.equal(clauses[0].body.includes("preamble"), false);
+  assert.equal(clauses[1].body.includes("preamble"), false);
+});
+
+test("rule golden: title-to-body — title lines are not part of any body", () => {
+  const { clauses } = detectClauses("## A\nA body.\n## B\nB body.");
+  // Title lines themselves never appear inside a body.
+  assert.equal(clauses[0].body, "A body.");
+  assert.equal(clauses[1].body, "B body.");
+});
+
+test("rule golden: synthetic body is the whole input, trimmed", () => {
+  const { tier, clauses } = detectClauses("   plain text body   ");
+  assert.equal(tier, "synthetic");
+  assert.equal(clauses[0].body, "plain text body");
+});
