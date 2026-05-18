@@ -1,0 +1,34 @@
+{
+  "negotiation_id": "example-nda-2026-05",
+  "parties": {
+    "a": { "name": "Acme Corporation", "address": "1 Acme Way" },
+    "b": { "name": "Globex Industries", "address": "100 Globex Plaza" }
+  },
+  "purpose": "Evaluation of a potential business transaction",
+  "template": "mutual",
+  "rounds": [
+    {
+      "round": 1,
+      "proposer": "a",
+      "text": "## 1. Purpose\n\nThis Mutual Non-Disclosure Agreement (the \"Agreement\") governs the\nexchange of confidential information between Acme Corporation (\"Acme\")\nand Globex Industries (\"Globex\") for the purpose of evaluating a\npotential business transaction.\n\n## 2. Term\n\nThe term of this Agreement is two (2) years from the Effective Date.\n\n## 3. Confidentiality Obligations\n\nEach party shall hold the other's Confidential Information in strict\nconfidence and shall not disclose it to any third party without the\ndisclosing party's prior written consent.\n\n## 4. Notices\n\nAll notices required or permitted under this Agreement shall be in\nwriting and delivered to the addresses on the cover page.\n\n## 5. Governing Law\n\nThis Agreement shall be governed by and construed in accordance with\nthe laws of the State of Delaware, without regard to its\nconflict-of-laws principles.\n",
+      "text_hash": "sha256:example-hash-1",
+      "clause_status": {
+        "purpose": "agreed",
+        "term": "agreed",
+        "confidentiality_obligations": "agreed",
+        "notices": "agreed",
+        "governing_law": "agreed"
+      },
+      "signed_at": "2026-05-15T14:00:00Z",
+      "signed_by": "a",
+      "hash_prev": "",
+      "hash_self": "sha256:example-hash-1-self"
+    }
+  ],
+  "status": "converged",
+  "stalemate_counter": 0,
+  "signoffs": {
+    "a": "Alice Chen (Acme General Counsel) 2026-05-16T09:30:00Z",
+    "b": "Bob Martinez (Globex VP Legal) 2026-05-16T11:15:00Z"
+  }
+}

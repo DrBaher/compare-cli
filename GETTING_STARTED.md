@@ -210,9 +210,81 @@ sign draft.pdf --signer counsel@acme.com
 Each tool reads stdin / writes stdout / exits with a documented code, so
 they compose cleanly.
 
+## Troubleshooting
+
+### `npx compare-cli ... --demo` errors with `sh: compare: command not found`
+
+The package is `compare-cli`; the installed bin is `compare`. npm 10.x's
+`npx` doesn't auto-resolve a bin when the names differ. Use the explicit
+form:
+
+```sh
+npx -p compare-cli@latest -- compare --demo
+```
+
+Or install globally (`npm install -g compare-cli`) and then `compare` is
+on `$PATH` directly. Same behavior, less typing.
+
+### `extracted zero characters from X.pdf`
+
+The PDF has no text layer — it's a scanned image. compare-cli is
+deliberately OCR-free (deterministic + zero-network is the contract;
+OCR engines are neither). Run an OCR tool first:
+
+```sh
+ocrmypdf scanned.pdf scanned-ocr.pdf
+compare base.docx scanned-ocr.pdf
+```
+
+`ocrmypdf` is a separate project; install it via your package manager.
+
+### Exit code 2 from `--demo`, surprised by `--check` exiting non-zero
+
+`compare --demo` runs against a deliberately-substantive-drift fixture
+(the bundled Term clause changed from "two (2) years" to "three (3)
+years"). Exit 2 is the contract — the demo demonstrates the gate, not
+clean state. Use `compare --version` or `compare --help` if you just
+want to confirm the bin runs.
+
+### `compare-cli-mcp` install: `EPEERINVALID compare-cli@…`
+
+`compare-cli-mcp@0.1.0` declared `peerDependencies.compare-cli: ^0.2.0`
+which doesn't satisfy `compare-cli@0.3.0+`. The warning is cosmetic —
+the server functions correctly because the `--json` shape is stable
+across compare-cli's v1.x. Upgrading to `compare-cli-mcp@0.1.1+`
+widens the peer-dep range and silences the warning.
+
+### `--from-negotiation: no agreed round found`
+
+The reader walks every round in `negotiation.json` looking for one of
+three signals (in order):
+
+1. Top-level `status: "converged" | "signed_off" | "finalized"`.
+2. A round with `agreed: true`.
+3. A round with `clause_status` whose every value is `"agreed"`.
+
+If none of those is true, the negotiation hasn't converged yet — call
+this from compare-cli prematurely and you'll get exit 2 with this
+message. Run `nda-review-cli negotiate status` to confirm.
+
+### CI shows a green `compare` step but my `npm publish` blocks
+
+If you're using compare-cli inside a publish workflow as a pre-flight
+sanity check, remember the exit codes:
+
+- `0` = safe, publish.
+- `2` = substantive drift — usually the right thing to **block** on.
+- `3` / `4` = cosmetic / moved — usually safe to publish (the agreement
+  didn't change), but if you want a strict gate, add `--strict` and
+  `--strict-cosmetic`.
+
+The default CI pattern from `AGENTS.md` "Pre-signature gate in a
+pipeline" routes these correctly.
+
 ## Next steps
 
 - **[COMPARE_SCHEMA.md](./COMPARE_SCHEMA.md)** for the locked v1 contract.
 - **[AGENTS.md](./AGENTS.md)** for the stable agent-facing surface.
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** for how the CLI is shaped.
 - **[FAQ.md](./FAQ.md)** for common questions.
+- **[mcp/README.md](./mcp/README.md)** if you're wiring it into an MCP client.

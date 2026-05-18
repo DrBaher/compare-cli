@@ -222,6 +222,50 @@ Useful when the agreement is "byte-perfect after normalization or do
 nothing" — e.g. financial term sheets where `$1,000` vs `$1000` is in
 fact meaningful.
 
+## Invoking via MCP
+
+For agent pipelines that prefer structured tool-calls over shelling out,
+`compare-cli-mcp` (separate npm package, lives in `mcp/`) wraps the CLI
+as an MCP (Model Context Protocol) server. Three tools, stdio transport,
+JSON-first responses.
+
+```sh
+npm install -g compare-cli@^0.3.0 compare-cli-mcp@^0.1.1
+compare-mcp  # spawns the server on stdio
+```
+
+Wire into Claude Desktop / Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "compare-cli": {
+      "command": "compare-mcp",
+      "env": { "COMPARE_MCP_BASE_DIR": "/path/to/contract/documents" }
+    }
+  }
+}
+```
+
+Tool catalog:
+
+| MCP tool                  | CLI equivalent                                       |
+|---------------------------|------------------------------------------------------|
+| `compare_files`           | `compare BASE CANDIDATE [options]`                   |
+| `compare_with_negotiation`| `compare --from-negotiation NEG.json CANDIDATE [...]`|
+| `compare_demo`            | `compare --demo`                                     |
+
+`structuredContent` returned by every successful tool call is **byte-
+identical** to the `compare --json` shape documented above; agents can
+read it without per-transport special-casing. Substantive drift is a
+successful tool call (not an MCP error) — same routing logic as the
+shell pattern above. Genuine errors (I/O failure, malformed input, no
+agreed round) surface as MCP errors with stable codes (`INPUT_NOT_FOUND`,
+`PDF_NO_TEXT_LAYER`, `NO_AGREED_ROUND`, etc.).
+
+Full spec: [`docs/mcp.md`](./docs/mcp.md) (design) and
+[`mcp/README.md`](./mcp/README.md) (usage / error catalog).
+
 ## Failure diagnosis
 
 | Symptom                                                | Likely cause                                                                  | Recovery                                                                  |
