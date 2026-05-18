@@ -3,6 +3,24 @@
 Versions independently from the parent [`compare-cli`](../CHANGELOG.md);
 both packages live in the same repo under [npm workspaces](../package.json).
 
+## 0.1.1 — 2026-05-18
+
+Patch: widen `compare-cli` peer-dependency range from `^0.2.0` to
+`>=0.2.0 <1.0.0`. Silences the `EPEERINVALID` warning that npm prints
+when installing alongside `compare-cli@0.3.0+`.
+
+### Changed
+
+- **`peerDependencies.compare-cli`** — was `^0.2.0`, now `>=0.2.0 <1.0.0`.
+  The structured `--json` shape compare-cli emits is locked across v1.x
+  per its AGENTS.md, so any 0.x ≥ 0.2.0 satisfies what this server
+  consumes. The `<1.0.0` upper bound reserves the right to require a
+  re-validation when compare-cli ships a 1.0 (which may include
+  intentional shape changes).
+
+No code change. No protocol change. Existing `tools/list` golden
+snapshot is unchanged.
+
 ## 0.1.0 — 2026-05-17
 
 Initial release. Implements [`docs/mcp.md`](../docs/mcp.md) design v1.0
