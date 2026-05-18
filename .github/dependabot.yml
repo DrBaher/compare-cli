@@ -1,0 +1,57 @@
+version: 2
+updates:
+  # Root compare-cli package — two runtime deps (jszip, pdfjs-dist), no devDeps.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: deps
+    labels:
+      - dependencies
+    # Group patch + minor bumps so we get one PR per week instead of one per dep.
+    # Majors stay separate — pdfjs-dist majors in particular need a CI matrix
+    # check (the Node-engine pin is downstream).
+    groups:
+      runtime:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  # MCP workspace — runtime dep @modelcontextprotocol/sdk + peer dep compare-cli.
+  # Peer deps are not auto-bumped by dependabot; the runtime dep is.
+  - package-ecosystem: npm
+    directory: /mcp
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps(mcp)"
+    labels:
+      - dependencies
+      - mcp
+    groups:
+      mcp-runtime:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  # GitHub Actions versions (uses: actions/...@vX).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci(actions)"
+    labels:
+      - dependencies
+      - ci
