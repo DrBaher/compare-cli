@@ -1,0 +1,50 @@
+name: release-mcp
+
+on:
+  push:
+    tags:
+      - 'mcp-v*'
+
+# Creates a GitHub Release for each pushed mcp-v* tag, with the body
+# extracted from the matching ## <version> section in mcp/CHANGELOG.md.
+# Symmetric with release.yml (which handles v* tags for the root package).
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Extract mcp/CHANGELOG section for this tag
+        id: extract
+        run: |
+          set -e
+          tag="${GITHUB_REF#refs/tags/mcp-v}"
+          node -e '
+            const fs = require("fs");
+            const tag = process.argv[1];
+            const md = fs.readFileSync("mcp/CHANGELOG.md", "utf8");
+            // Escape dots in the version for the regex. Same shell-quoting
+            // discipline as release.yml — see its inline comment.
+            const re = new RegExp("^## " + tag.replace(/[.]/g, "\\.") + "(?:[\\s—]|$)", "m");
+            const start = md.search(re);
+            if (start === -1) {
+              console.error("no mcp/CHANGELOG section for " + tag);
+              process.exit(1);
+            }
+            const after = md.slice(start);
+            const next = after.indexOf("\n## ", 1);
+            const section = next === -1 ? after : after.slice(0, next);
+            const body = section.replace(/^## [^\n]+\n+/, "");
+            fs.writeFileSync("/tmp/release-notes.md", body);
+          ' "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "mcp-v${{ steps.extract.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --title "compare-cli-mcp v${{ steps.extract.outputs.tag }}" \
+            --notes-file /tmp/release-notes.md

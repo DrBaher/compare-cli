@@ -1,6 +1,6 @@
 {
   "name": "compare-cli-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP (Model Context Protocol) server wrapping compare-cli for agent pipelines. Three tools: compare_files, compare_with_negotiation, compare_demo. Stdio transport. Part of cli.drbaher.com contract-CLI suite.",
   "type": "module",
   "bin": {
@@ -44,6 +44,6 @@
     "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "peerDependencies": {
-    "compare-cli": "^0.2.0"
+    "compare-cli": ">=0.2.0 <1.0.0"
   }
 }
