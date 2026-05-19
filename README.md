@@ -17,7 +17,14 @@ compare negotiated.docx ready-to-sign.pdf
 # exit 4 = clauses moved, content identical
 ```
 
-Part of the [contract-operations suite](https://cli.drbaher.com).
+> Part of the contract-operations CLI suite.
+> [**draft-cli**](https://github.com/DrBaher/draft-cli) (fill placeholders) →
+> [**nda-review-cli**](https://github.com/DrBaher/nda-review-cli) (review, redline, negotiate) →
+> [**docx2pdf-cli**](https://github.com/DrBaher/docx2pdf-cli) (DOCX → PDF) →
+> [**sign-cli**](https://github.com/DrBaher/sign-cli) (signing + audit).
+> Storage: [**template-vault-cli**](https://github.com/DrBaher/template-vault-cli).
+> Drift detection: **compare-cli** (this CLI).
+> [Showcase site](https://cli.drbaher.com).
 
 > **Agent pipelines:** see [`mcp/README.md`](./mcp/README.md) for `compare-cli-mcp`, the MCP server wrapping this CLI. Three tools (`compare_files`, `compare_with_negotiation`, `compare_demo`), stdio transport, JSON-first responses. Design contract: [`docs/mcp.md`](./docs/mcp.md).
 
@@ -280,6 +287,10 @@ silently reporting no drift.
 
 [cli.drbaher.com](https://cli.drbaher.com)
 
+Pipeline (in order):
+
+- **[draft-cli](https://github.com/DrBaher/draft-cli)** — fills
+  placeholders in templates before negotiation begins.
 - **[nda-review-cli](https://github.com/DrBaher/nda-review-cli)** — owns
   the `negotiation.json` hash-chained state file. `--from-negotiation`
   reads its output.
@@ -288,8 +299,9 @@ silently reporting no drift.
   in the signing envelope.
 - **[sign-cli](https://github.com/DrBaher/sign-cli)** — runs the actual
   signing flow; compare-cli is the gate that runs before it.
-- **draft-cli** (recently joined the suite) — fills placeholders in
-  templates before negotiation begins.
+
+Auxiliaries:
+
 - **[template-vault-cli](https://github.com/DrBaher/template-vault-cli)**
   — clause-aware template storage; produces `info --json` payloads that
   downstream tools consume. Implements the same clause-detection rule
