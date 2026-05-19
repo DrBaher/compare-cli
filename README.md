@@ -290,8 +290,12 @@ silently reporting no drift.
   signing flow; compare-cli is the gate that runs before it.
 - **draft-cli** (recently joined the suite) — fills placeholders in
   templates before negotiation begins.
-- **template-vault-cli** (forthcoming) — stores the canonical templates
-  compare-cli will eventually share clause-detection logic with.
+- **[template-vault-cli](https://github.com/DrBaher/template-vault-cli)**
+  — clause-aware template storage; produces `info --json` payloads that
+  downstream tools consume. Implements the same clause-detection rule
+  ([docs/clause-detection.md](./docs/clause-detection.md)) compare-cli
+  does; divergences tracked in
+  [template-vault-cli/docs/clause-detection-divergence.md](https://github.com/DrBaher/template-vault-cli/blob/main/docs/clause-detection-divergence.md).
 
 ## Documentation
 
