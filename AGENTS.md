@@ -4,19 +4,11 @@ This file describes the **stable surface** of `compare-cli` for LLM agents
 and downstream tooling. The exit codes and `--json` shape documented here
 are stable across v1.x minor releases.
 
-## The contract
+## Output contract
 
-`compare-cli` is a deterministic pre-signature gate. Given two contract
+`compare-cli` is a deterministic pre-signature gate: given two contract
 versions (`BASE` = what was agreed, `CANDIDATE` = what's being put forward),
-it returns an exit code that classifies the drift between them.
-
-| Exit | `exit_class`     | Meaning                                                             |
-|------|------------------|---------------------------------------------------------------------|
-| `0`  | `clean`          | No drift detected. Every clause matches. Safe to sign.              |
-| `1`  | n/a              | I/O error — input not found, unreadable, malformed `.docx`/`.pdf`.  |
-| `2`  | `substantive`    | Substantive drift, or `--strict`/`--strict-cosmetic` was tripped.   |
-| `3`  | `cosmetic` / `typographic` | Cosmetic-only or typographic-only drift. Informational.   |
-| `4`  | `moved`          | Clause(s) moved but content identical.                              |
+it classifies the drift between them and reports it via the exit code.
 
 **`stdout` is the report.** Human-readable when stdout is a TTY (with ANSI
 color), structured JSON when `--json` is set, plain text otherwise.
@@ -25,6 +17,19 @@ color), structured JSON when `--json` is set, plain text otherwise.
 messages go to stderr. `--silent` / `-q` suppresses all stderr output;
 exit codes are unchanged. Argument-parse errors always print on the real
 stderr regardless of `--silent`.
+
+## Exit codes
+
+The exit code **is** the verdict — these are drift severities, not just
+error/success, so branch on them (don't assume the suite's common scheme):
+
+| Exit | `exit_class`     | Meaning                                                             |
+|------|------------------|---------------------------------------------------------------------|
+| `0`  | `clean`          | No drift detected. Every clause matches. Safe to sign.              |
+| `1`  | n/a              | I/O error — input not found, unreadable, malformed `.docx`/`.pdf`.  |
+| `2`  | `substantive`    | Substantive drift, or `--strict`/`--strict-cosmetic` was tripped.   |
+| `3`  | `cosmetic` / `typographic` | Cosmetic-only or typographic-only drift. Informational.   |
+| `4`  | `moved`          | Clause(s) moved but content identical.                              |
 
 ## `--json` output shape (stable across v1.x)
 
@@ -125,7 +130,7 @@ When `--json` is set and an I/O or arg error occurs, stdout emits:
 { "ok": false, "error": "<message>", "exit_code": <int> }
 ```
 
-## Discovery commands
+## Discovery
 
 For an agent integrating compare-cli, the safe discovery sequence is:
 
@@ -266,7 +271,7 @@ agreed round) surface as MCP errors with stable codes (`INPUT_NOT_FOUND`,
 Full spec: [`docs/mcp.md`](./docs/mcp.md) (design) and
 [`mcp/README.md`](./mcp/README.md) (usage / error catalog).
 
-## Failure diagnosis
+## Failure → recovery
 
 | Symptom                                                | Likely cause                                                                  | Recovery                                                                  |
 |--------------------------------------------------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------------|

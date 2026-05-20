@@ -1328,11 +1328,26 @@ export function getCatalog() {
   };
 }
 
+const COMPARE_FIRST_RUN_HINT = `compare — clause-aware drift gate between two contract versions.
+
+Try this:
+  compare --demo                       zero-config demo (exits 2 on the fixture)
+  compare <base> <candidate>           human report
+  compare <base> <candidate> --json    structured verdict for agents
+
+Exit codes: 0 clean · 2 substantive drift · 3 cosmetic/typographic · 4 clauses moved.
+Part of the contract-ops CLI suite: template-vault → draft → nda-review → compare → docx2pdf → sign.
+Docs: https://cli.drbaher.com/tools/compare-cli/  ·  compare --help
+`;
+
 export async function main(argv, io = {}) {
   const out = io.out || process.stdout;
   const err = io.err || process.stderr;
   const env = io.env || process.env;
   const stdinReader = io.stdinReader;
+
+  // Bare invocation (no args at all) → friendly first-run hint, not an error.
+  if (argv.length === 0) { out.write(COMPARE_FIRST_RUN_HINT); return EXIT.OK; }
 
   let parsed;
   try { parsed = parseArgs(argv); }
