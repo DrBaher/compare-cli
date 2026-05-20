@@ -1,8 +1,28 @@
 // parseArgs + UsageError shape
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseArgs, UsageError, main } from "../compare-cli.mjs";
+import { parseArgs, UsageError, main, getCatalog } from "../compare-cli.mjs";
 import { runMain } from "./_helpers.mjs";
+
+test("parseArgs recognizes --catalog json (no positionals required)", () => {
+  assert.equal(parseArgs(["--catalog", "json"]).opts.catalog, "json");
+  assert.equal(parseArgs(["--catalog=json"]).opts.catalog, "json");
+});
+
+test("getCatalog: machine-readable flag inventory with drift exit codes", () => {
+  const c = getCatalog();
+  assert.equal(c.name, "compare-cli");
+  assert.equal(c.bin, "compare");
+  assert.ok(c.flags.some(f => f.name === "--catalog"));
+  assert.ok(c.flags.some(f => f.name === "--from-negotiation"));
+  assert.match(c.exitCodes["2"], /substantive/);
+});
+
+test("main --catalog json prints the catalog and exits 0", async () => {
+  const { code, out } = await runMain(main, ["--catalog", "json"]);
+  assert.equal(code, 0);
+  assert.equal(JSON.parse(out).bin, "compare");
+});
 
 test("two positionals are BASE and CANDIDATE", () => {
   const { opts } = parseArgs(["a.docx", "b.pdf"]);

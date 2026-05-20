@@ -77,6 +77,7 @@ const KNOWN_FLAGS = Object.freeze([
   "--no-intra-diff",
   "--output", "-o",
   "--completion",
+  "--catalog",
 ]);
 
 export function parseArgs(argv) {
@@ -100,6 +101,7 @@ export function parseArgs(argv) {
     version: false,
     demo: false,
     completion: null,
+    catalog: null,
   };
   const positional = [];
 
@@ -125,6 +127,8 @@ export function parseArgs(argv) {
     else if (a.startsWith("--from-negotiation=")) opts.fromNegotiation = a.slice("--from-negotiation=".length);
     else if (a === "--output" || a === "-o") opts.output = requireValue(argv, ++i, "--output");
     else if (a.startsWith("--output=")) opts.output = a.slice("--output=".length);
+    else if (a === "--catalog") opts.catalog = requireValue(argv, ++i, "--catalog");
+    else if (a.startsWith("--catalog=")) opts.catalog = a.slice("--catalog=".length);
     else if (a === "--completion") {
       const v = requireValue(argv, ++i, "--completion");
       if (v !== "bash" && v !== "zsh") throw new UsageError(`--completion: unknown shell '${v}' (want bash or zsh)`);
@@ -147,7 +151,7 @@ export function parseArgs(argv) {
     throw new UsageError("--require-signoffs requires --from-negotiation");
   }
 
-  if (opts.help || opts.version || opts.demo || opts.completion !== null) return { opts, positional };
+  if (opts.help || opts.version || opts.demo || opts.completion !== null || opts.catalog !== null) return { opts, positional };
 
   if (opts.fromNegotiation !== null) {
     if (positional.length !== 1) {
@@ -1173,7 +1177,7 @@ _compare_cli_complete() {
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
-  opts="--help --version --demo --json --sarif --why --strict --strict-cosmetic --silent --check --from-negotiation --require-signoffs --only-clauses --ignore-clauses --no-intra-diff --output --completion"
+  opts="--help --version --demo --json --sarif --why --strict --strict-cosmetic --silent --check --from-negotiation --require-signoffs --only-clauses --ignore-clauses --no-intra-diff --output --completion --catalog"
   case "\$prev" in
     --completion) COMPREPLY=( $(compgen -W "bash zsh" -- "\$cur") ); return 0 ;;
     --from-negotiation|--output) COMPREPLY=( $(compgen -f -- "\$cur") ); return 0 ;;
@@ -1252,6 +1256,7 @@ OPTIONS
   --output, -o PATH         write report to PATH instead of stdout (ignored with --check)
   --completion bash|zsh     emit shell completion script
   --demo                    run a zero-file 30-second demo
+  --catalog json            machine-readable command + flag inventory (for agents)
   --version, -V             print version
   --help, -h                show this help
 
@@ -1272,6 +1277,57 @@ Part of the contract-operations suite — https://cli.drbaher.com
 // main()
 // ----------------------------------------------------------------------------
 
+/**
+ * Machine-readable command + flag inventory, emitted by `compare --catalog json`.
+ * Mirrors the suite-wide discovery contract (every contract-ops CLI answers
+ * `--catalog json`). compare is flag-based, so this is a flag inventory — note
+ * the exit codes are drift severities, not the suite's usual error codes.
+ */
+export function getCatalog() {
+  return {
+    name: "compare-cli",
+    bin: "compare",
+    version: VERSION,
+    description: "Clause-aware drift detection between two contract versions.",
+    usage: [
+      "compare <base> <candidate> [options]",
+      "compare --from-negotiation negotiation.json <candidate> [options]",
+      "compare --demo",
+      "compare - <candidate>   (read base from stdin)",
+    ],
+    flags: [
+      { name: "--json", type: "boolean", help: "Emit the structured verdict as JSON (stable across v1.x)." },
+      { name: "--sarif", type: "boolean", help: "Emit SARIF 2.1.0 for code-scanning; mutually exclusive with --json." },
+      { name: "--why", type: "boolean", help: "Explain the classification (inline word-diff for substantive changes)." },
+      { name: "--check", type: "boolean", help: "Exit-code-only gate (implies --silent)." },
+      { name: "--strict", type: "boolean", help: "Upgrade cosmetic/typographic drift to substantive (exit 2)." },
+      { name: "--strict-cosmetic", type: "boolean", help: "Upgrade cosmetic-only drift to substantive (exit 2)." },
+      { name: "--from-negotiation", arg: "FILE", help: "Read the agreed base text from nda-review-cli's negotiation.json." },
+      { name: "--require-signoffs", type: "boolean", help: "With --from-negotiation, require both parties' sign-offs." },
+      { name: "--only-clauses", arg: "PATTERNS", help: "Restrict comparison to matching clause titles." },
+      { name: "--ignore-clauses", arg: "PATTERNS", help: "Exclude matching clause titles from comparison." },
+      { name: "--no-intra-diff", type: "boolean", help: "Skip the inline word-diff within changed clauses." },
+      { name: "--output", aliases: ["-o"], arg: "PATH", help: "Write the report to PATH (default: stdout)." },
+      { name: "--silent", aliases: ["-q"], type: "boolean", help: "Suppress stderr output." },
+      { name: "--completion", arg: "bash|zsh", help: "Emit a shell completion script." },
+      { name: "--demo", type: "boolean", help: "Run the bundled drift demo (exits 2)." },
+      { name: "--catalog", arg: "json", help: "Print this catalog and exit (agents call at startup)." },
+      { name: "--help", aliases: ["-h"], type: "boolean", help: "Show usage and exit." },
+      { name: "--version", aliases: ["-V"], type: "boolean", help: "Print version and exit." },
+    ],
+    inputs: "Two positionals (base, candidate); each accepts .docx / .pdf / .md / .txt and `-` for stdin. With --from-negotiation, one positional (the candidate).",
+    discovery: { catalog: "compare --catalog json", json: "compare <base> <candidate> --json" },
+    exitCodes: {
+      "0": "clean — clauses match (safe to sign)",
+      "1": "I/O error",
+      "2": "substantive drift — do not sign without review",
+      "3": "cosmetic / typographic drift only (informational)",
+      "4": "clauses moved but content identical",
+    },
+    note: "Exit codes 2/3/4 are drift severities, not errors — they differ from the suite's common 0/2/3/4 meanings.",
+  };
+}
+
 export async function main(argv, io = {}) {
   const out = io.out || process.stdout;
   const err = io.err || process.stderr;
@@ -1288,6 +1344,11 @@ export async function main(argv, io = {}) {
 
   if (opts.help) { out.write(HELP_TEXT); return EXIT.OK; }
   if (opts.version) { out.write(`compare-cli ${VERSION}\n`); return EXIT.OK; }
+  if (opts.catalog) {
+    if (opts.catalog !== "json") { err.write(`unknown --catalog format '${opts.catalog}'. Supported: json\n`); return EXIT.IO; }
+    out.write(JSON.stringify(getCatalog(), null, 2) + "\n");
+    return EXIT.OK;
+  }
   if (opts.completion) {
     try { out.write(completionScript(opts.completion)); return EXIT.OK; }
     catch (e) { err.write(`error: ${e.message}\n`); return EXIT.IO; }
