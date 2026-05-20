@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // compare-cli — clause-aware drift detection between two contract versions.
-// Part of the contract-operations suite. MIT. See LICENSE.
+// Part of the contract-ops suite. MIT. See LICENSE.
 //
 // Spec: COMPARE_SCHEMA.md
 // Sibling reference: draft-cli.mjs
@@ -1270,7 +1270,7 @@ EXIT CODES
 DOCS
   https://github.com/DrBaher/compare-cli  •  See COMPARE_SCHEMA.md for the locked contract.
 
-Part of the contract-operations suite — https://cli.drbaher.com
+Part of the contract-ops suite — https://cli.drbaher.com
 `;
 
 // ----------------------------------------------------------------------------

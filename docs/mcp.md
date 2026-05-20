@@ -10,7 +10,7 @@ The in-suite reference implementation we draw from is
 [sign-cli's MCP server](https://github.com/DrBaher/sign-cli/blob/main/src/lib/mcp-server.ts)
 (stdio + JSON-RPC, protocol revision `2024-11-05`, snake_case tool names).
 Where the design diverges from sign-cli's choices, the reason is called out
-inline. compare-cli is the current MCP gap in the contract-operations suite;
+inline. compare-cli is the current MCP gap in the contract-ops suite;
 once shipped, it sits next to the `--from-negotiation` reader as the second
 agent-driven entry point into the pre-signature gate.
 

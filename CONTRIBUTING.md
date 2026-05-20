@@ -1,7 +1,7 @@
 # Contributing to compare-cli
 
 Thanks for your interest. compare-cli is part of the
-[contract-operations suite](https://cli.drbaher.com) and shares posture
+[contract-ops suite](https://cli.drbaher.com) and shares posture
 with its siblings:
 [draft-cli](https://github.com/DrBaher/draft-cli),
 [nda-review-cli](https://github.com/DrBaher/nda-review-cli),

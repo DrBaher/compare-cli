@@ -278,7 +278,7 @@ Replaces the section as written for 0.1.0.
 > with sign-cli on the pdfjs pin won the trade-off.
 
 Initial release. Single-file Node.js CLI for clause-aware drift detection
-between two contract versions. Part of the contract-operations suite
+between two contract versions. Part of the contract-ops suite
 ([cli.drbaher.com](https://cli.drbaher.com)).
 
 ### Added

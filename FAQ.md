@@ -112,7 +112,7 @@ whole text differs in these ways" rather than erroring.
 
 ## Why Node.js instead of Python?
 
-To match the contract-operations suite's JavaScript lane.
+To match the contract-ops suite's JavaScript lane.
 [draft-cli](https://github.com/DrBaher/draft-cli),
 [docx2pdf-cli](https://github.com/DrBaher/docx2pdf-cli), and
 [sign-cli](https://github.com/DrBaher/sign-cli) are Node; sharing a

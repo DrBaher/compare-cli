@@ -5,4 +5,4 @@ contact_links:
     about: Report security issues privately via GitHub's vulnerability reporting (see SECURITY.md).
   - name: Suite-level discussion
     url: https://cli.drbaher.com
-    about: The contract-operations CLI suite that compare-cli is part of.
+    about: The contract-ops CLI suite that compare-cli is part of.

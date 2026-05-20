@@ -188,7 +188,7 @@ for `--from-negotiation` and `--output`.
 
 ## 11. Compose with the rest of the suite
 
-`compare-cli` lives in the middle of a contract-operations pipeline:
+`compare-cli` lives in the middle of a contract-ops pipeline:
 
 ```sh
 # Fill the template

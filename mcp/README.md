@@ -6,7 +6,7 @@ MCP (Model Context Protocol) server wrapping [`compare-cli`](https://github.com/
 
 > Design contract: [`../docs/mcp.md`](../docs/mcp.md). This package ships the implementation; behavior and schemas track the design version.
 
-Part of the [contract-operations suite](https://cli.drbaher.com).
+Part of the [contract-ops suite](https://cli.drbaher.com).
 
 ---
 

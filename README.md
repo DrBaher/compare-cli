@@ -8,6 +8,8 @@
 > Clause-aware drift detection between two contract versions. Pre-signature
 > gate for legal teams and agent pipelines. Single-file Node CLI, two runtime
 > deps, deterministic by design, no LLM tier in v1.
+>
+> Part of the **contract-ops CLI suite**: [**template-vault-cli**](https://github.com/DrBaher/template-vault-cli) (storage) → [**draft-cli**](https://github.com/DrBaher/draft-cli) (fill placeholders) → [**nda-review-cli**](https://github.com/DrBaher/nda-review-cli) (review, redline, negotiate) → [**docx2pdf-cli**](https://github.com/DrBaher/docx2pdf-cli) (DOCX → PDF) → [**sign-cli**](https://github.com/DrBaher/sign-cli) (signing + audit). **compare-cli** is the pre-signature drift gate. [Showcase site](https://cli.drbaher.com/).
 
 ```sh
 compare negotiated.docx ready-to-sign.pdf
@@ -17,7 +19,7 @@ compare negotiated.docx ready-to-sign.pdf
 # exit 4 = clauses moved, content identical
 ```
 
-> Part of the contract-operations CLI suite.
+> Part of the contract-ops CLI suite.
 > [**draft-cli**](https://github.com/DrBaher/draft-cli) (fill placeholders) →
 > [**nda-review-cli**](https://github.com/DrBaher/nda-review-cli) (review, redline, negotiate) →
 > [**docx2pdf-cli**](https://github.com/DrBaher/docx2pdf-cli) (DOCX → PDF) →
@@ -283,7 +285,7 @@ If extraction returns zero characters (a scanned PDF without an OCR
 layer), compare-cli **exits 1** with a clear message rather than
 silently reporting no drift.
 
-## Part of the contract-operations suite
+## Part of the contract-ops suite
 
 [cli.drbaher.com](https://cli.drbaher.com)
 
