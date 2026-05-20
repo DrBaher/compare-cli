@@ -73,7 +73,7 @@ Squash to clean history before merging.
    class boundary, clause detection rules), update
    [COMPARE_SCHEMA.md](./COMPARE_SCHEMA.md) **first** and call out the
    bump in the PR description.
-4. Open the PR. The CI matrix (Ubuntu × macOS × Node 18 / 20 / 22) +
+4. Open the PR. The CI matrix (Ubuntu × macOS × Node 20 / 22) +
    coverage gate + smoke build must all pass.
 
 ## Release process

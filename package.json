@@ -30,16 +30,19 @@
   },
   "keywords": [
     "legal",
+    "legal-tech",
     "contracts",
+    "contract-ops",
     "diff",
     "compare",
     "drift",
     "pre-signature",
-    "cli"
+    "cli",
+    "agent-first"
   ],
   "author": "DrBaher",
   "license": "MIT",
-  "homepage": "https://github.com/DrBaher/compare-cli",
+  "homepage": "https://cli.drbaher.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/DrBaher/compare-cli.git"

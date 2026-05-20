@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.1.x   | ✓         |
+| 0.3.x   | ✓         |
 
 While the project is in `0.x`, only the latest minor receives fixes. Once
 the project leaves `0.x`, this policy will update.

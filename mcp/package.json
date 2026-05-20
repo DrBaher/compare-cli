@@ -1,7 +1,7 @@
 {
   "name": "compare-cli-mcp",
   "version": "0.1.1",
-  "description": "MCP (Model Context Protocol) server wrapping compare-cli for agent pipelines. Three tools: compare_files, compare_with_negotiation, compare_demo. Stdio transport. Part of cli.drbaher.com contract-CLI suite.",
+  "description": "MCP (Model Context Protocol) server wrapping compare-cli for agent pipelines. Three tools: compare_files, compare_with_negotiation, compare_demo. Stdio transport. Part of the contract-ops CLI suite.",
   "type": "module",
   "bin": {
     "compare-mcp": "./compare-cli-mcp.mjs"

@@ -85,7 +85,7 @@ not match your intuition. Renaming to "Definitions — Persons" and
 No. That's [nda-review-cli](https://github.com/DrBaher/nda-review-cli)'s
 `negotiate validate`. compare-cli reads the chain for its text but
 doesn't verify it. If you need integrity guarantees, run
-`nda-review negotiate validate` first.
+`nda-review-cli negotiate validate` first.
 
 A `--verify-chain` flag is reserved for v2.
 

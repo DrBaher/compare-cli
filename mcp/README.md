@@ -15,7 +15,7 @@ Part of the [contract-ops suite](https://cli.drbaher.com).
 `compare-cli-mcp` has `compare-cli` as a peer dependency, so install both:
 
 ```sh
-npm install -g compare-cli@^0.2.0 compare-cli-mcp@^0.1.0
+npm install -g compare-cli@^0.3.0 compare-cli-mcp@^0.1.1
 ```
 
 Then run:

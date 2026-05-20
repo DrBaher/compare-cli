@@ -195,16 +195,16 @@ for `--from-negotiation` and `--output`.
 draft template.docx --party-a Acme --party-b Globex --output draft.docx
 
 # Convert to PDF for the signing envelope
-docx2pdf draft.docx --output draft.pdf
+docx2pdf draft.docx draft.pdf
 
 # Negotiate (rounds happen here, producing negotiation.json)
-nda-review negotiate ...
+nda-review-cli negotiate ...
 
 # Gate: does the final PDF match the agreed text?
 compare --from-negotiation negotiation.json draft.pdf || exit $?
 
 # Sign
-sign draft.pdf --signer counsel@acme.com
+sign document draft.pdf --signer "Acme Counsel"
 ```
 
 Each tool reads stdin / writes stdout / exits with a documented code, so
