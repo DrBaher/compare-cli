@@ -72,7 +72,7 @@ to run, since the two names differ.)
 
 Requires Node ≥ 20. (Pinned by `pdfjs-dist@^5.7.284`, which we share with [sign-cli](https://github.com/DrBaher/sign-cli).)
 
-## 30-second first run
+## Run this
 
 ```sh
 compare --demo
@@ -88,6 +88,15 @@ compare --demo --json
 ```
 
 Same comparison, structured JSON output to stdout.
+
+## Where to go next
+
+| If you are… | Start here |
+|---|---|
+| **A new user** evaluating the gate | [Run this](#run-this) above, then the [End-to-end transcript](#end-to-end-transcript) |
+| **An LLM agent** driving the CLI | [AGENTS.md](AGENTS.md) → `compare --catalog json` → `compare <base> <candidate> --json` |
+| **Gating in CI** | `compare --check` (exit-code only) or `--sarif` for code-scanning |
+| **Wiring via MCP** | the `compare-cli-mcp` package — see [docs/mcp.md](docs/mcp.md) |
 
 ## End-to-end transcript
 
