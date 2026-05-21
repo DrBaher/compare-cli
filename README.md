@@ -97,6 +97,7 @@ Same comparison, structured JSON output to stdout.
 | **An LLM agent** driving the CLI | [AGENTS.md](AGENTS.md) → `compare --catalog json` → `compare <base> <candidate> --json` |
 | **Gating in CI** | `compare --check` (exit-code only) or `--sarif` for code-scanning |
 | **Wiring via MCP** | the `compare-cli-mcp` package — see [docs/mcp.md](docs/mcp.md) |
+| **Adding a new CLI to the suite** | The [build-a-CLI playbook](https://cli.drbaher.com/build-a-cli) — the conventions every suite CLI follows |
 
 ## End-to-end transcript
 
