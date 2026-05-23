@@ -12,6 +12,15 @@ and the project adheres to semantic versioning once it leaves 0.x.
 > only. See [`mcp/README.md`](./mcp/README.md) for `compare-cli-mcp` and
 > [`docs/mcp.md`](./docs/mcp.md) for the design contract.
 
+## 0.4.0 — 2026-05-23
+
+### Added
+- **`compare --catalog json`** — the suite-wide discovery contract
+  (`{name, bin, version, description, flags, exitCodes}`), so an agent learns
+  every flag and the exit-code spectrum at startup instead of hardcoding them.
+- Friendly first-run hint on a bare `compare` invocation (was a terse error);
+  AGENTS.md aligned to the suite's section headings; README/docs cross-links.
+
 ## 0.3.0 — 2026-05-17
 
 Minor: surface WordprocessingML track-changes metadata from `.docx` inputs.
