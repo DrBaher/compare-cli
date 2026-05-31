@@ -12,6 +12,19 @@ and the project adheres to semantic versioning once it leaves 0.x.
 > only. See [`mcp/README.md`](./mcp/README.md) for `compare-cli-mcp` and
 > [`docs/mcp.md`](./docs/mcp.md) for the design contract.
 
+## 0.4.1 — 2026-05-31
+
+### Fixed
+- **`--catalog json` mislabeled `--strict` semantics.** The agent-facing
+  discovery catalog described `--strict` as upgrading "cosmetic/typographic
+  drift to substantive", but `--strict` only upgrades *typographic* drift;
+  cosmetic drift requires the separate `--strict-cosmetic`. The catalog help
+  string now reads "Upgrade typographic drift to substantive (exit 2)." to
+  match `HELP_TEXT`, `computeExitClass`, and `COMPARE_SCHEMA.md` §7.1. Since
+  the catalog is the machine-readable contract agents read, this corrects a
+  contract-level inaccuracy. (`--strict-cosmetic`'s catalog entry was already
+  correct.)
+
 ## 0.4.0 — 2026-05-23
 
 ### Added

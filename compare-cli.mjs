@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 // Constants
 // ----------------------------------------------------------------------------
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.4.1";
 
 // Stable exit codes. Documented in AGENTS.md and never re-numbered without a
 // major-version bump.
@@ -1300,7 +1300,7 @@ export function getCatalog() {
       { name: "--sarif", type: "boolean", help: "Emit SARIF 2.1.0 for code-scanning; mutually exclusive with --json." },
       { name: "--why", type: "boolean", help: "Explain the classification (inline word-diff for substantive changes)." },
       { name: "--check", type: "boolean", help: "Exit-code-only gate (implies --silent)." },
-      { name: "--strict", type: "boolean", help: "Upgrade cosmetic/typographic drift to substantive (exit 2)." },
+      { name: "--strict", type: "boolean", help: "Upgrade typographic drift to substantive (exit 2)." },
       { name: "--strict-cosmetic", type: "boolean", help: "Upgrade cosmetic-only drift to substantive (exit 2)." },
       { name: "--from-negotiation", arg: "FILE", help: "Read the agreed base text from nda-review-cli's negotiation.json." },
       { name: "--require-signoffs", type: "boolean", help: "With --from-negotiation, require both parties' sign-offs." },
