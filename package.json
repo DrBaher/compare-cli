@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "jszip": "^3.10.1",
-    "pdfjs-dist": "^5.7.284"
+    "pdfjs-dist": "^6.0.227"
   },
   "workspaces": [
     "mcp"
