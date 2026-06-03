@@ -12,6 +12,21 @@ and the project adheres to semantic versioning once it leaves 0.x.
 > only. See [`mcp/README.md`](./mcp/README.md) for `compare-cli-mcp` and
 > [`docs/mcp.md`](./docs/mcp.md) for the design contract.
 
+## 0.4.2 — 2026-06-03
+
+Security/robustness fixes from a follow-up source audit.
+
+### Fixed
+- **Terminal-injection hardening.** C0 control characters (except `\n`/`\t`) are stripped
+  from counterparty-controlled strings in the human formatter (clause titles/bodies,
+  intra-diff text, and docx track-change author names) to prevent ANSI/terminal injection
+  on a TTY. `--json`/SARIF output is unaffected.
+- **`--catalog`/`--completion` fast-paths** now resolve even with `--require-signoffs` set
+  (they no longer trip the negotiation guard).
+- **Structured error envelopes preserved.** The `--json` input-error envelope is
+  pretty-printed and carries `exit_class:"error"`; an `--output` write failure in
+  `--json`/`--sarif` mode emits a structured error envelope instead of plain text.
+
 ## 0.4.1 — 2026-05-31
 
 ### Fixed

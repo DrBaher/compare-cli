@@ -3,6 +3,22 @@
 Versions independently from the parent [`compare-cli`](../CHANGELOG.md);
 both packages live in the same repo under [npm workspaces](../package.json).
 
+## 0.1.2 — 2026-06-03
+
+Robustness fixes from a follow-up source audit.
+
+### Fixed
+- **Error mapping.** A missing negotiation file now maps to `INPUT_NOT_FOUND` (was the
+  catch-all `INPUT_MALFORMED`); malformed JSON surfaces the canonical "malformed JSON in …"
+  message rather than a raw `SyntaxError`.
+- **Argument validation.** `only_clauses`/`ignore_clauses` are validated as arrays and
+  throw `INVALID_ARGS` instead of crashing to `INTERNAL_ERROR` on a bare value.
+- **Temp-dir cleanup** of `content_json` is always performed via `try`/`finally`.
+- **Reported tier consistency.** `negotiation_resolution` is derived by replaying
+  `readNegotiation`'s exact tier selection, so the reported tier cannot disagree with the
+  one actually used.
+- **`MCP_VERSION`** corrected (had drifted to `0.1.0` while the package was `0.1.1`).
+
 ## 0.1.1 — 2026-05-18
 
 Patch: widen `compare-cli` peer-dependency range from `^0.2.0` to

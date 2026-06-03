@@ -29,7 +29,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, isAbsolute } from "node:path";
 import { Writable } from "node:stream";
 
-export const MCP_VERSION = "0.1.0";
+export const MCP_VERSION = "0.1.2";
 
 // ----------------------------------------------------------------------------
 // Error class — carries a stable code for the MCP error envelope.

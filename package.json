@@ -1,6 +1,6 @@
 {
   "name": "compare-cli",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Clause-aware drift detection between two contract versions. Pre-signature gate for legal teams and agent pipelines. Part of the contract-ops suite.",
   "type": "module",
   "bin": {
