@@ -97,6 +97,17 @@ test("--help and --version short-circuit before positional check", () => {
   assert.doesNotThrow(() => parseArgs(["--version"]));
 });
 
+test("--require-signoffs does not block --catalog / --completion fast-paths", () => {
+  // Regression: --require-signoffs is only meaningful with --from-negotiation,
+  // but the discovery fast-paths (--catalog, --completion) must still resolve.
+  assert.doesNotThrow(() => parseArgs(["--require-signoffs", "--catalog", "json"]));
+  assert.equal(parseArgs(["--require-signoffs", "--catalog", "json"]).opts.catalog, "json");
+  assert.doesNotThrow(() => parseArgs(["--require-signoffs", "--completion", "bash"]));
+  assert.equal(parseArgs(["--require-signoffs", "--completion", "bash"]).opts.completion, "bash");
+  // Still rejected when no negotiation source and no fast-path.
+  assert.throws(() => parseArgs(["--require-signoffs", "a.md", "b.md"]), /requires --from-negotiation/);
+});
+
 test("-- end-of-flags marker", () => {
   const { opts } = parseArgs(["--", "--this-is-a-filename", "b"]);
   assert.equal(opts.base, "--this-is-a-filename");

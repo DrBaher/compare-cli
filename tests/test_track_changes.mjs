@@ -186,6 +186,36 @@ test("human report shows track-changes summary block when TC present", async () 
   assert.match(out, /base\s+:\s+1 insertion\(s\), 1 deletion\(s\) \(authors: Alice, Bob\)/);
 });
 
+test("human report strips C0 control chars from track-change author names (no ANSI injection)", async () => {
+  const dir = tmp();
+  // Counterparty-controlled author name carrying a raw ESC + SGR sequence.
+  const evilAuthor = "Mallory\x1b[31mRED\x1b[0m\x07";
+  const base = await makeDocx(dir, "base.docx", [
+    "## A",
+    [
+      { text: "x " },
+      { type: "ins", text: "y", author: evilAuthor, date: "2026-05-17T10:00:00Z" },
+    ],
+  ]);
+  const cand = await makeDocx(dir, "cand.docx", ["## A", "x y"]);
+  const { out } = await runMain(main, [base, cand]);
+  // ESC (0x1b) and BEL (0x07) must not survive into the rendered output.
+  assert.equal(out.includes("\x1b["), false, "ESC sequence leaked into human output");
+  assert.equal(out.includes("\x07"), false, "BEL leaked into human output");
+  // The printable text of the name is preserved (only controls stripped).
+  assert.match(out, /authors: Mallory\[31mRED\[0m/);
+});
+
+test("human report strips C0 control chars from clause titles and bodies", async () => {
+  const { tmp: t, makeFile } = await import("./_helpers.mjs");
+  const dir = t();
+  // Clause title + body carrying raw ESC; markdown heading is the clause title.
+  const base = makeFile(dir, "base.md", "## 1. Term\x1b[31m\n\nThe term is two\x1b[2J years.\n");
+  const cand = makeFile(dir, "cand.md", "## 1. Term\x1b[31m\n\nThe term is three\x1b[2J years.\n");
+  const { out } = await runMain(main, [base, cand]);
+  assert.equal(out.includes("\x1b"), false, "ESC leaked from clause title/body into human output");
+});
+
 test("human report omits track-changes block when neither side has TC", async () => {
   const { tmp: t, makeFile } = await import("./_helpers.mjs");
   const dir = t();

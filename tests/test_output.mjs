@@ -137,6 +137,40 @@ test("--output with --json writes JSON to file", async () => {
   assert.equal(r.exit_class, "substantive");
 });
 
+test("--json input error: pretty-printed envelope with ok:false + exit_class + exit_code", async () => {
+  const dir = tmp();
+  const a = makeFile(dir, "a.md", BASE);
+  const missing = join(dir, "does-not-exist.md");
+  const { code, out } = await runMain(main, [a, missing, "--json"]);
+  assert.equal(code, EXIT.IO);
+  const r = JSON.parse(out);
+  assert.equal(r.ok, false);
+  assert.equal(r.exit_class, "error");
+  assert.equal(r.exit_code, EXIT.IO);
+  assert.ok(typeof r.error === "string" && r.error.length > 0);
+  // Pretty-printed (multi-line), matching the success envelope's 2-space indent.
+  assert.match(out, /\n  "error":/);
+});
+
+test("--output write failure in --json mode emits a structured error (not plain text)", async () => {
+  const dir = tmp();
+  const a = makeFile(dir, "a.md", BASE);
+  const b = makeFile(dir, "b.md", CAND_SUBSTANTIVE);
+  // Point --output at a path whose parent is a file → ENOTDIR on write.
+  const notADir = makeFile(dir, "blocker", "x");
+  const badOut = join(notADir, "report.json");
+  const { code, out, err } = await runMain(main, [a, b, "--json", "--output", badOut]);
+  assert.equal(code, EXIT.IO);
+  // The JSON contract is preserved: error is structured on stderr.
+  const r = JSON.parse(err);
+  assert.equal(r.ok, false);
+  assert.equal(r.exit_class, "error");
+  assert.equal(r.exit_code, EXIT.IO);
+  assert.match(r.error, /cannot write/);
+  // stdout stays clean (no half-written report, no plain-text error).
+  assert.equal(out, "");
+});
+
 test("colorEnabled honors NO_COLOR (forced off)", () => {
   const fakeTTY = { isTTY: true };
   assert.equal(colorEnabled(fakeTTY, { NO_COLOR: "1" }), false);

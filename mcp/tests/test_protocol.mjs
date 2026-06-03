@@ -215,6 +215,104 @@ test("compare_with_negotiation: require_signoffs without signoffs → NOT_SIGNED
   assert.equal(r.structuredContent.code, "NOT_SIGNED_OFF");
 });
 
+test("compare_with_negotiation: missing negotiation file (base dir unset) → INPUT_NOT_FOUND", async () => {
+  // Regression: with COMPARE_MCP_BASE_DIR unset, enforceBaseDir passes the path
+  // through and a non-existent file must map to INPUT_NOT_FOUND, not the
+  // catch-all INPUT_MALFORMED.
+  assert.equal(process.env.COMPARE_MCP_BASE_DIR, undefined);
+  const dir = mkdtempSync(join(tmpdir(), "compare-cli-mcp-test-"));
+  const missing = join(dir, "does-not-exist.json");
+  const r = await dispatchMcp("compare_with_negotiation", {
+    negotiation: { path: missing },
+    candidate: { content_text: "x" },
+  });
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.code, "INPUT_NOT_FOUND");
+});
+
+test("compare_with_negotiation: malformed JSON negotiation file → INPUT_MALFORMED (canonical message, no raw SyntaxError)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "compare-cli-mcp-test-"));
+  const negPath = join(dir, "neg.json");
+  writeFileSync(negPath, "{ this is not valid json ");
+  const r = await dispatchMcp("compare_with_negotiation", {
+    negotiation: { path: negPath },
+    candidate: { content_text: "x" },
+  });
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.code, "INPUT_MALFORMED");
+  // Canonical compare-cli message, not a bare "Unexpected token" engine string.
+  assert.match(r.content[0].text, /malformed JSON in/);
+});
+
+test("compare_with_negotiation: malformed JSON via content_json is handled (and temp dir cleaned)", async () => {
+  // content_json is always a parsed object, so this exercises the
+  // round-trip-through-temp-file path with a value that JSON.stringify can
+  // serialize but that has no agreed round → NO_AGREED_ROUND, not a crash.
+  const r = await dispatchMcp("compare_with_negotiation", {
+    negotiation: { content_json: { rounds: [{ round: 1, text: "x" }] } },
+    candidate: { content_text: "x" },
+  });
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.code, "NO_AGREED_ROUND");
+});
+
+test("compare_files: non-array only_clauses → INVALID_ARGS (not INTERNAL_ERROR)", async () => {
+  const r = await dispatchMcp("compare_files", {
+    base: { content_text: "## A\n\nbody.\n" },
+    candidate: { content_text: "## A\n\nbody changed.\n" },
+    only_clauses: "Termination", // a bare string, not an array
+  });
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.code, "INVALID_ARGS");
+  assert.match(r.content[0].text, /only_clauses: expected an array/);
+});
+
+test("compare_files: non-array ignore_clauses → INVALID_ARGS", async () => {
+  const r = await dispatchMcp("compare_files", {
+    base: { content_text: "## A\n\nbody.\n" },
+    candidate: { content_text: "## A\n\nbody changed.\n" },
+    ignore_clauses: { not: "an array" },
+  });
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.code, "INVALID_ARGS");
+  assert.match(r.content[0].text, /ignore_clauses: expected an array/);
+});
+
+test("compare_with_negotiation: valid array clause filters still accepted", async () => {
+  const r = await dispatchMcp("compare_with_negotiation", {
+    negotiation: { content_json: { rounds: [{ round: 1, text: "## A\n\nbody.\n", agreed: true }] } },
+    candidate: { content_text: "## A\n\nbody.\n" },
+    only_clauses: ["A"],
+  });
+  assert.equal(r.isError, undefined);
+  assert.equal(r.structuredContent.exit_class, "clean");
+});
+
+test("compare_with_negotiation: negotiation_resolution reflects the tier readNegotiation actually used, not a naive pre-parse", async () => {
+  // Finding 9 regression. No top-level status. The latest round has agreed:true
+  // but NO text; the earlier round has clause_status all-"agreed" WITH text.
+  // readNegotiation requires a round to *have text* before honoring agreed:true,
+  // so it skips the textless agreed round and selects the clause_status round.
+  // The reported resolution must follow that selection ("clause_status"), not
+  // the textless agreed round a naive latest-first scan would have labeled
+  // "per_round_agreed".
+  const agreedText = "## A\n\nbody.\n";
+  const r = await dispatchMcp("compare_with_negotiation", {
+    negotiation: {
+      content_json: {
+        rounds: [
+          { round: 1, text: agreedText, clause_status: { c1: "agreed", c2: "agreed" } },
+          { round: 2, agreed: true }, // latest, agreed, but NO text → skipped
+        ],
+      },
+    },
+    candidate: { content_text: agreedText },
+  });
+  assert.equal(r.isError, undefined);
+  assert.equal(r.structuredContent.exit_class, "clean");
+  assert.equal(r.structuredContent.base.negotiation_resolution, "clause_status");
+});
+
 // ---------------------------------------------------------------------------
 // COMPARE_MCP_BASE_DIR lockdown
 // ---------------------------------------------------------------------------

@@ -147,7 +147,7 @@ export function parseArgs(argv) {
   if (opts.json && opts.sarif) throw new UsageError("--json and --sarif are mutually exclusive");
 
   // --require-signoffs is meaningful only with --from-negotiation.
-  if (opts.requireSignoffs && opts.fromNegotiation === null && !opts.help && !opts.version && !opts.demo) {
+  if (opts.requireSignoffs && opts.fromNegotiation === null && !opts.help && !opts.version && !opts.demo && opts.catalog === null && opts.completion === null) {
     throw new UsageError("--require-signoffs requires --from-negotiation");
   }
 
@@ -971,9 +971,10 @@ function renderWordDiff(ops, stream, env) {
   const useColor = colorEnabled(stream, env);
   const parts = [];
   for (const o of ops) {
-    if (o.op === "equal") parts.push(o.text);
-    else if (o.op === "removed") parts.push(useColor ? paint(stream, "red", o.text, env) : `[-${o.text}-]`);
-    else parts.push(useColor ? paint(stream, "green", o.text, env) : `{+${o.text}+}`);
+    const t = sanitizeControl(o.text);
+    if (o.op === "equal") parts.push(t);
+    else if (o.op === "removed") parts.push(useColor ? paint(stream, "red", t, env) : `[-${t}-]`);
+    else parts.push(useColor ? paint(stream, "green", t, env) : `{+${t}+}`);
   }
   return parts.join("");
 }
@@ -1028,7 +1029,7 @@ export function formatReportHuman(report, { stream, env = process.env, intraDiff
         : d.class === "removed"
         ? `(base clause ${d.clause_index_base})`
         : `(clause ${d.clause_index_base}${d.clause_index_base !== d.clause_index_candidate ? ` → ${d.clause_index_candidate}` : ""})`;
-      lines.push(`${tag} ${d.clause_title} ${c("dim", idx)}`);
+      lines.push(`${tag} ${sanitizeControl(d.clause_title)} ${c("dim", idx)}`);
       if (d.class === "moved") {
         lines.push(c("dim", `       moved from position ${d.clause_index_base} to position ${d.clause_index_candidate}`));
       } else if (d.class === "added") {
@@ -1064,7 +1065,7 @@ export function formatReportHuman(report, { stream, env = process.env, intraDiff
       if (ops.length === 0) return null;
       const ins = ops.filter((o) => o.op === "ins").length;
       const del = ops.filter((o) => o.op === "del").length;
-      const authors = [...new Set(ops.map((o) => o.author).filter(Boolean))];
+      const authors = [...new Set(ops.map((o) => o.author).filter(Boolean))].map(sanitizeControl);
       const auth = authors.length > 0 ? ` (authors: ${authors.join(", ")})` : "";
       return `  ${side}:      ${ins} insertion(s), ${del} deletion(s)${auth}`;
     };
@@ -1090,9 +1091,19 @@ export function formatReportHuman(report, { stream, env = process.env, intraDiff
   return lines.join("\n") + "\n";
 }
 
+// Strip C0 control characters (except \n and \t) from counterparty-controlled
+// strings before printing to a TTY. Without this, raw ESC (0x1b) in docx
+// track-change author names or clause titles/bodies could inject ANSI escape
+// sequences / terminal control codes. JSON/SARIF modes are unaffected (they
+// serialize the raw string), so this lives in the human formatter only.
+function sanitizeControl(s) {
+  if (s == null) return "";
+  return String(s).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
+}
+
 function truncate(s, n = 180) {
   if (s == null) return "";
-  const flat = String(s).replace(/\s+/g, " ").trim();
+  const flat = sanitizeControl(String(s)).replace(/\s+/g, " ").trim();
   return flat.length <= n ? flat : flat.slice(0, n - 1) + "…";
 }
 
@@ -1391,7 +1402,7 @@ export async function main(argv, io = {}) {
   } catch (e) {
     if (!opts.silent) {
       if (opts.json) {
-        out.write(JSON.stringify({ ok: false, error: e.message, exit_code: e.exit || EXIT.IO }) + "\n");
+        out.write(JSON.stringify({ ok: false, error: e.message, exit_class: "error", exit_code: e.exit || EXIT.IO }, null, 2) + "\n");
       } else if (opts.sarif) {
         out.write(JSON.stringify({ version: "2.1.0", runs: [{ tool: { driver: { name: "compare-cli", version: VERSION } }, invocations: [{ executionSuccessful: false, exitCode: e.exit || EXIT.IO, exitCodeDescription: e.message }], results: [] }] }, null, 2) + "\n");
       } else {
@@ -1458,7 +1469,16 @@ async function runCompare({ base, candidate, opts, out, err, env }) {
     const { writeFileSync } = await import("node:fs");
     try { writeFileSync(opts.output, body, "utf8"); }
     catch (e) {
-      if (!opts.silent) err.write(`error: cannot write ${opts.output}: ${e.message}\n`);
+      const msg = `cannot write ${opts.output}: ${e.message}`;
+      if (!opts.silent) {
+        if (opts.json) {
+          err.write(JSON.stringify({ ok: false, error: msg, exit_class: "error", exit_code: EXIT.IO }, null, 2) + "\n");
+        } else if (opts.sarif) {
+          err.write(JSON.stringify({ version: "2.1.0", runs: [{ tool: { driver: { name: "compare-cli", version: VERSION } }, invocations: [{ executionSuccessful: false, exitCode: EXIT.IO, exitCodeDescription: msg }], results: [] }] }, null, 2) + "\n");
+        } else {
+          err.write(`error: ${msg}\n`);
+        }
+      }
       return EXIT.IO;
     }
   } else {

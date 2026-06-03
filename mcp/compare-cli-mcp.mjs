@@ -24,7 +24,7 @@ import {
   EXIT,
   VERSION as COMPARE_CLI_VERSION,
 } from "compare-cli";
-import { readFileSync, writeFileSync, mkdtempSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, isAbsolute } from "node:path";
 import { Writable } from "node:stream";
@@ -155,7 +155,10 @@ function enforceBaseDir(p) {
 // Map a thrown error from readInput / readNegotiation to an McpToolError.
 function mapReadError(e, path) {
   const msg = e && e.message ? e.message : String(e);
-  if (/input not found|cannot read/i.test(msg)) {
+  // A raw ENOENT (e.g. from a direct readFileSync when COMPARE_MCP_BASE_DIR is
+  // unset, so enforceBaseDir never ran a missing-file check) should map to
+  // INPUT_NOT_FOUND, not the default INPUT_MALFORMED.
+  if ((e && e.code === "ENOENT") || /input not found|cannot read|no such file/i.test(msg)) {
     return new McpToolError("INPUT_NOT_FOUND", msg, { path });
   }
   if (/malformed/i.test(msg)) {
@@ -226,6 +229,17 @@ function buildErrorEnvelope(err) {
   };
 }
 
+// Normalize an only_clauses / ignore_clauses argument to a frozen string[] or
+// null. A bare (non-array) value used to reach .map and crash to INTERNAL_ERROR;
+// reject it as INVALID_ARGS instead so the agent gets an actionable code.
+function normalizeClauseFilter(value, name) {
+  if (value == null) return null;
+  if (!Array.isArray(value)) {
+    throw new McpToolError("INVALID_ARGS", `${name}: expected an array of strings`);
+  }
+  return Object.freeze(value.map(String));
+}
+
 // ----------------------------------------------------------------------------
 // Tool handlers
 // ----------------------------------------------------------------------------
@@ -237,8 +251,8 @@ export async function handleCompareFiles(args) {
     base, candidate,
     strict: args.strict,
     strict_cosmetic: args.strict_cosmetic,
-    only_clauses: args.only_clauses ? Object.freeze(args.only_clauses.map(String)) : null,
-    ignore_clauses: args.ignore_clauses ? Object.freeze(args.ignore_clauses.map(String)) : null,
+    only_clauses: normalizeClauseFilter(args.only_clauses, "only_clauses"),
+    ignore_clauses: normalizeClauseFilter(args.ignore_clauses, "ignore_clauses"),
   });
   return buildSuccessEnvelope(report, { includeHumanReport: !!args.include_human_report });
 }
@@ -271,11 +285,13 @@ export async function handleCompareWithNegotiation(args) {
       throw mapReadError(e, negPath);
     }
   } else {
-    // content_json — inline parsed object
+    // content_json — inline parsed object. We round-trip it through a temp file
+    // so readNegotiation can do its canonical parse/validation; the temp dir is
+    // always removed in finally (it must not outlive this call).
     const tmpdirPath = mkdtempSync(join(tmpdir(), "compare-cli-mcp-"));
     const negPath = join(tmpdirPath, "negotiation.json");
-    writeFileSync(negPath, JSON.stringify(negSpec.content_json), "utf8");
     try {
+      writeFileSync(negPath, JSON.stringify(negSpec.content_json), "utf8");
       const { text, resolution } = readNegotiationWithResolution(negPath, { requireSignoffs: !!args.require_signoffs });
       baseText = text;
       negotiationResolution = resolution;
@@ -287,6 +303,8 @@ export async function handleCompareWithNegotiation(args) {
         throw new McpToolError("NOT_SIGNED_OFF", e.message, { source: "content_json" });
       }
       throw mapReadError(e, "<content_json>");
+    } finally {
+      rmSync(tmpdirPath, { recursive: true, force: true });
     }
   }
 
@@ -296,35 +314,56 @@ export async function handleCompareWithNegotiation(args) {
     base, candidate,
     strict: args.strict,
     strict_cosmetic: args.strict_cosmetic,
-    only_clauses: args.only_clauses ? Object.freeze(args.only_clauses.map(String)) : null,
-    ignore_clauses: args.ignore_clauses ? Object.freeze(args.ignore_clauses.map(String)) : null,
+    only_clauses: normalizeClauseFilter(args.only_clauses, "only_clauses"),
+    ignore_clauses: normalizeClauseFilter(args.ignore_clauses, "ignore_clauses"),
     negotiation_resolution: negotiationResolution,
   });
   return buildSuccessEnvelope(report, { includeHumanReport: !!args.include_human_report });
 }
 
 // Wrapper around readNegotiation that also tells us which signal produced the
-// agreed text. Implemented by inspecting the parsed JSON before delegating —
-// avoids a second pass through readNegotiation.
+// agreed text, so the MCP layer can surface negotiation_resolution.
 function readNegotiationWithResolution(path, opts) {
-  // readNegotiation throws on missing/invalid; pre-parse to capture the
-  // resolution. We accept the small duplication of the parse here as the
-  // price of exposing negotiation_resolution to the agent (see docs/mcp.md §6).
-  const raw = readFileSync(path, "utf8");
-  const parsed = JSON.parse(raw);
+  // The canonical read is the source of truth for BOTH the agreed text and any
+  // user-facing error (missing file, malformed JSON, no agreed round). It runs
+  // first so the engine's raw ENOENT / SyntaxError never leaks: readNegotiation
+  // produces the canonical messages ("input not found", "malformed JSON in …")
+  // that mapReadError keys off, keeping the error envelope stable.
+  const text = readNegotiation(path, opts);
+  // Derive the resolution label by replaying readNegotiation's *exact* tier
+  // selection against the same parsed object, then matching the round whose
+  // text it returned. This keeps negotiation_resolution honest: agents are
+  // told to trust it for base provenance (docs/mcp.md §6), so it must never
+  // disagree with the tier readNegotiation actually used (e.g. status agreed
+  // but the only text lives in a per-round-agreed round). Best-effort: any
+  // mismatch / parse hiccup degrades to "unknown" rather than throwing.
   let resolution = "unknown";
-  if (typeof parsed.status === "string" && ["converged", "signed_off", "finalized"].includes(parsed.status)) {
-    resolution = "status";
-  } else if (Array.isArray(parsed.rounds)) {
-    for (let i = parsed.rounds.length - 1; i >= 0; i--) {
-      const r = parsed.rounds[i];
-      if (r && r.agreed === true) { resolution = "per_round_agreed"; break; }
-      if (r && r.clause_status && typeof r.clause_status === "object" && Object.values(r.clause_status).length > 0 && Object.values(r.clause_status).every((v) => v === "agreed")) {
-        resolution = "clause_status"; break;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    const rounds = Array.isArray(parsed.rounds) ? parsed.rounds : [];
+    const AGREED = ["converged", "signed_off", "finalized"];
+    // Tier 1: top-level status — returns the latest round that has text.
+    if (typeof parsed.status === "string" && AGREED.includes(parsed.status)) {
+      for (let i = rounds.length - 1; i >= 0; i--) {
+        const r = rounds[i];
+        if (r && typeof r === "object" && typeof r.text === "string") { resolution = "status"; break; }
       }
     }
+    // Tier 2 + 3: per-round signals, latest-first, only on rounds with text.
+    if (resolution === "unknown") {
+      for (let i = rounds.length - 1; i >= 0; i--) {
+        const r = rounds[i];
+        if (!r || typeof r !== "object" || typeof r.text !== "string") continue;
+        if (r.agreed === true) { resolution = "per_round_agreed"; break; }
+        if (r.clause_status && typeof r.clause_status === "object") {
+          const values = Object.values(r.clause_status);
+          if (values.length > 0 && values.every((v) => v === "agreed")) { resolution = "clause_status"; break; }
+        }
+      }
+    }
+  } catch {
+    resolution = "unknown";
   }
-  const text = readNegotiation(path, opts);
   return { text, resolution };
 }
 
