@@ -3,6 +3,14 @@
 Versions independently from the parent [`compare-cli`](../CHANGELOG.md);
 both packages live in the same repo under [npm workspaces](../package.json).
 
+## 0.1.3 — 2026-06-07
+
+### Added
+- **Listed on the official MCP Registry.** Added `server.json` + the `mcpName`
+  field (`io.github.DrBaher/compare-cli-mcp`) and a registry-publish step (GitHub
+  OIDC) to the `mcp-v*` release workflow, so agent runtimes can discover the
+  compare/drift MCP server and it stays version-current. No runtime/API changes.
+
 ## 0.1.2 — 2026-06-03
 
 Robustness fixes from a follow-up source audit.

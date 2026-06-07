@@ -1,6 +1,7 @@
 {
   "name": "compare-cli-mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
+  "mcpName": "io.github.DrBaher/compare-cli-mcp",
   "description": "MCP (Model Context Protocol) server wrapping compare-cli for agent pipelines. Three tools: compare_files, compare_with_negotiation, compare_demo. Stdio transport. Part of the contract-ops CLI suite.",
   "type": "module",
   "bin": {
@@ -12,6 +13,7 @@
   },
   "files": [
     "compare-cli-mcp.mjs",
+    "server.json",
     "README.md",
     "CHANGELOG.md"
   ],
