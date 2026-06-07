@@ -3,6 +3,13 @@
 Versions independently from the parent [`compare-cli`](../CHANGELOG.md);
 both packages live in the same repo under [npm workspaces](../package.json).
 
+## 0.1.4 — 2026-06-07
+
+### Fixed
+- Shorten `server.json` `description` to ≤100 chars (MCP Registry validation
+  limit) so the registry publish succeeds. 0.1.3 published to npm but failed the
+  registry step on length; no runtime change.
+
 ## 0.1.3 — 2026-06-07
 
 ### Added

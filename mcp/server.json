@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.DrBaher/compare-cli-mcp",
-  "description": "MCP server wrapping compare-cli — contract version diff / redline and a substantive-drift gate as agent tools. Local-first; wraps the installed compare CLI.",
+  "description": "MCP server for compare-cli: contract version diff/redline and a drift gate as agent tools.",
   "repository": {
     "url": "https://github.com/DrBaher/compare-cli",
     "source": "github",
     "subfolder": "mcp"
   },
-  "version": "0.1.3",
+  "version": "0.1.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "compare-cli-mcp",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "transport": {
         "type": "stdio"
       }
