@@ -43,7 +43,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@modelcontextprotocol/sdk": "^1.30.0"
   },
   "peerDependencies": {
     "compare-cli": ">=0.2.0 <1.0.0"
